@@ -1,0 +1,12 @@
+<div id="video-list">
+    {{ range .Videos }}
+        <div>
+            <p>{{ .Channel }} - {{ .Title }} ({{ .VideoID }})</p>
+            <button hx-delete="/delete-video/{{ .VideoID }}" hx-target="#video-list">Delete</button>
+        </div>
+        <audio controls>
+            <source src="/audio/{{ .VideoID }}" type="audio/mpeg">
+            Your browser does not support the audio element.
+          </audio>
+    {{ end }}
+</div>

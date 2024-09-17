@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to Podcast RSS</title>
+    <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+</head>
+<body>
+    <h1>Add YouTube Video</h1>
+    <a href="./rss">RSS-Feed</a><br>
+    <form hx-post="/fetch-video-metadata" hx-target="#video-list" hx-swap="outerHTML">
+        <label for="youtube_url">YouTube URL:</label>
+        <input type="text" id="youtube_url" name="youtube_url" required>
+        <button type="submit">Add Video</button>
+    </form>
+
+    <h2>Saved Video IDs</h2>
+    {{ template "video_list.html" . }}
+</body>
+</html>
