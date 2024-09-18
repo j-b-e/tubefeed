@@ -6,20 +6,36 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var db *sql.DB
+const (
+	listenPort = 8091
+	audioPath  = "./audio/"
+	dbPath     = "./config/yt2pod.db"
+	hostname   = "luchs"
+)
 
-var yturl = func(id string) string { return fmt.Sprintf("https://www.youtube.com/watch?v=%s", id) }
+var (
+	db *sql.DB
+	// Mutex to handle concurrent access during file download
+	downloadMutex        sync.Mutex
+	externalURL          = fmt.Sprintf("%s:%d", hostname, listenPort)
+	yturl                = func(id string) string { return fmt.Sprintf("https://www.youtube.com/watch?v=%s", id) }
+	downloadAudioIDMutex = make(map[string]*sync.RWMutex)
+	downloadInProgress   sync.Map
+)
 
 // VideoMetadata holds the data retrieved from YouTube API
 type VideoMetadata struct {
@@ -69,15 +85,6 @@ type PodcastEnclosure struct {
 	Length string `xml:"length,attr"`
 	Type   string `xml:"type,attr"`
 }
-
-const (
-	listenPort = 8091
-	audioPath  = "./audio/"
-	dbPath     = "./config/yt2pod.db"
-	hostname   = "luchs"
-)
-
-var externalURL = fmt.Sprintf("%s:%d", hostname, listenPort)
 
 func main() {
 	var err error
@@ -158,25 +165,62 @@ func main() {
 	})
 
 	// Stream or download audio route
-	r.GET("/audio/:id", func(c *gin.Context) {
-		id := c.Param("id")
-		audioFile, err := getAudioPath(id)
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
-		}
-		if _, ok := c.GetQuery("download"); ok {
-			c.Header("Content-Type", "application/octet-stream")
-			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.mp3", id))
-		} else {
-			c.Header("Content-Type", "audio/mpeg")
-			c.Header("Content-Disposition", fmt.Sprintf("inline; filename=%s.mp3", id))
-		}
-		c.File(audioFile)
-	})
+	r.GET("/audio/:id", streamAudio)
 
 	// Start the web server
 	r.Run(fmt.Sprintf(":%d", listenPort))
+}
+
+func streamAudio(c *gin.Context) {
+	audioID := c.Param("id")
+	audioFilePath := filepath.Join(audioPath, fmt.Sprintf("%s.mp3", audioID))
+
+	// Check if the file exists
+	if fileExists(audioFilePath) {
+		if _, ok := c.GetQuery("download"); ok {
+			c.Header("Content-Type", "application/octet-stream")
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.mp3", audioID))
+		} else {
+			c.Header("Content-Type", "audio/mpeg")
+			c.Header("Content-Disposition", fmt.Sprintf("inline; filename=%s.mp3", audioID))
+		}
+		c.File(audioFilePath)
+		return
+	}
+
+	// Check if a download is already in progress
+	if inProgress, _ := downloadInProgress.Load(audioID); inProgress == true {
+		// Return early with a message indicating the download is in progress
+		c.JSON(http.StatusProcessing, gin.H{"message": "Audio download in progress, please try again later"})
+		return
+	}
+
+	downloadInProgress.Store(audioID, true)
+	defer downloadInProgress.Delete(audioID)
+
+	// File does not exist, attempt to download it
+	downloadMutex.Lock()
+	// Ensure that we have a mutex for the audioID
+	if _, ok := downloadAudioIDMutex[audioID]; !ok {
+		downloadAudioIDMutex[audioID] = &sync.RWMutex{}
+	}
+	audioMutex := downloadAudioIDMutex[audioID]
+	defer downloadMutex.Unlock()
+
+	audioMutex.Lock()
+
+	if !fileExists(audioFilePath) {
+		go func() {
+			defer audioMutex.Unlock()
+			err := downloadAudioFile(audioID)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		}()
+	}
+	c.JSON(http.StatusProcessing, gin.H{"msg": "Audio is processing"})
+
 }
 
 func checkforDuplicate(videoID string) (bool, error) {
@@ -329,22 +373,27 @@ func generatePodcastRSSFeed(videos []VideoMetadata) string {
 	return xml.Header + string(output)
 }
 
-func getAudioPath(id string) (string, error) {
+func downloadAudioFile(id string) error {
 	path := fmt.Sprintf("%s/%s.mp3", audioPath, id)
 	cachepath := fmt.Sprintf("./.cache/%s.mp3", id)
 	_, err := os.Stat(path)
 	if err == nil {
-		return path, nil
+		return nil
 	}
 	cmd := exec.Command("yt-dlp", "--quiet", "--extract-audio", "--audio-format", "mp3", "-o", cachepath, yturl(id))
 	log.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
-		return "", err
+		return err
 	}
 	err = os.Rename(cachepath, path)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return path, nil
+	return nil
+}
+
+func fileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return !errors.Is(err, fs.ErrNotExist)
 }
