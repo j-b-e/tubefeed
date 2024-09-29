@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
 	"tubefeed/internal/rss"
@@ -32,13 +31,8 @@ var (
 	downloadInProgress   sync.Map
 )
 
-const (
-	pingDelay time.Duration = time.Second * 30
-)
-
 // Run main app
-func Run() {
-	var err error
+func Run() (err error) {
 
 	config.Db, err = sql.Open("sqlite3", config.DbPath)
 	if err != nil {
@@ -66,12 +60,13 @@ func Run() {
 		videoID, err := extractVideoID(youtubeURL)
 		if err != nil {
 			log.Println(err)
-			c.AbortWithError(http.StatusInternalServerError, err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
 		duplicate, err := checkforDuplicate(videoID)
 		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
 		if duplicate {
@@ -81,7 +76,7 @@ func Run() {
 		videoMetadata, err := fetchYouTubeMetadata(videoID)
 		if err != nil {
 			log.Println(err)
-			c.AbortWithError(http.StatusInternalServerError, err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
 
@@ -104,7 +99,8 @@ func Run() {
 		// Delete the video from the database
 		err := deleteVideo(id)
 		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
 		// Reload the page with the updated video list
@@ -125,8 +121,7 @@ func Run() {
 	})
 
 	// Start the web server
-	r.Run(fmt.Sprintf(":%d", config.ListenPort))
-
+	return r.Run(fmt.Sprintf(":%d", config.ListenPort))
 }
 
 func streamAudio(c *gin.Context) {
@@ -215,25 +210,27 @@ func extractVideoID(url string) (string, error) {
 }
 
 // Fetches YouTube video metadata
-func fetchYouTubeMetadata(videoID string) (video.VideoMetadata, error) {
+func fetchYouTubeMetadata(videoID string) (video video.VideoMetadata, err error) {
 	cmd := exec.Command("yt-dlp", "--quiet", "--skip-download", "--dump-json", yt.Yturl(videoID))
 	out, err := cmd.Output()
 	if err != nil {
 		log.Println(err)
-		return video.VideoMetadata{}, err
+		return video, err
 	}
 	var result map[string]any
-	json.Unmarshal([]byte(out), &result)
+	err = json.Unmarshal([]byte(out), &result)
+	if err != nil {
+		return video, err
+	}
 
 	if result["id"] != videoID {
-		return video.VideoMetadata{}, errors.New("video id from result didnt match")
+		return video, errors.New("video id from result didnt match")
 	}
-	return video.VideoMetadata{
-		Title:   result["title"].(string),
-		Channel: result["uploader"].(string),
-		Length:  int(result["duration"].(float64)),
-		VideoID: videoID,
-	}, nil
+	video.Title = result["title"].(string)
+	video.Channel = result["uploader"].(string)
+	video.Length = int(result["duration"].(float64))
+	video.VideoID = videoID
+	return video, nil
 }
 
 // Deletes a video by ID from the database
