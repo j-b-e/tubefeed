@@ -1,0 +1,16 @@
+<tr id="audio-{{ .VideoID }}"> 
+    <td><audio controls>
+        <source src="/audio/{{ .VideoID }}" type="audio/mpeg">
+        Your browser does not support the audio element.
+      </audio>
+    </td>
+    <td>
+        {{ .Channel }} - {{ .Title }} ({{ .VideoID }})
+    </td>
+    <td>
+        {{ .Status }}
+    </td>
+    <td>
+        <button hx-delete="/audio/{{ .VideoID }}" hx-target="#video-list" hx-swap="outerHTML swap:1s">Delete</button>
+    </td>
+</tr>

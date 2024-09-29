@@ -3,19 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube to Podcast RSS</title>
-    <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+    <title>Tubefeed - YouTube to Podcast RSS</title>
+    <script src="static/htmx.min.js"></script>
+    <link rel="icon" type="image/x-icon" href="/static/favicon-32x32.png">
+    <style>
+        tr.htmx-swapping td {
+        opacity: 0;
+        transition: opacity 1s ease-out;
+        }
+    </style>
 </head>
 <body>
-    <h1>Add YouTube Video</h1>
-    <a href="./rss">RSS-Feed</a><br>
-    <form hx-post="/fetch-video-metadata" hx-target="#video-list" hx-swap="outerHTML">
+    <h1>Tubefeed</h1>
+    
+    <p>Copy this link into your Podcast App: <a href="./rss">RSS-Feed</a></p>
+    <h2>Add a Youtube Video</h2>
+    <form hx-post="/audio" hx-target="#video-list">
         <label for="youtube_url">YouTube URL:</label>
         <input type="text" id="youtube_url" name="youtube_url" required>
-        <button type="submit">Add Video</button>
+        <button type="submit" hx-indicator="#indicator">Add Video</button>
     </form>
 
-    <h2>Saved Video IDs</h2>
+    <h2>Playlist</h2>
+    <div id="video-list">
     {{ template "video_list.html" . }}
+    </div>
+    <script>
+
+    </script>
+
 </body>
 </html>

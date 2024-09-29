@@ -1,4 +1,4 @@
-module yt2pod
+module tubefeed
 
 go 1.19
 
