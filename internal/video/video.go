@@ -6,29 +6,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"tubefeed/internal/config"
 	"tubefeed/internal/yt"
 )
 
 // VideoMetadata holds the data retrieved from YouTube API
 type VideoMetadata struct {
-	VideoID string
-	Title   string
-	Channel string
-	Length  int
-	Status  string
+	VideoID   string
+	Title     string
+	Channel   string
+	Length    int
+	Status    string
+	AudioPath string // path to audio data
 }
 
-func DownloadAudioFile(id string) error {
+func (v VideoMetadata) Download() error {
 
-	path := filepath.Join(config.AudioPath, fmt.Sprintf("%s.mp3", id))
-	cachepath := fmt.Sprintf("./.cache/%s.mp3", id)
+	path := filepath.Join(v.AudioPath, fmt.Sprintf("%s.mp3", v.VideoID))
+	cachepath := fmt.Sprintf("./.cache/%s.mp3", v.VideoID)
 	log.Printf("Starting Download: %s", path)
 	_, err := os.Stat(path)
 	if err == nil {
 		return nil
 	}
-	cmd := exec.Command("yt-dlp", "--quiet", "--extract-audio", "--audio-format", "mp3", "-o", cachepath, yt.Yturl(id))
+	cmd := exec.Command("yt-dlp", "--quiet", "--extract-audio", "--audio-format", "mp3", "-o", cachepath, yt.Yturl(v.VideoID))
 	log.Println(cmd)
 	err = cmd.Run()
 	if err != nil {

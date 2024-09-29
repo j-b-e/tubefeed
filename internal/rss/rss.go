@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"time"
-	"tubefeed/internal/config"
 	"tubefeed/internal/video"
 	"tubefeed/internal/yt"
 )
@@ -50,21 +49,31 @@ type PodcastEnclosure struct {
 	Type   string `xml:"type,attr"`
 }
 
+type RSS struct {
+	ExternalUrl string
+}
+
+func NewRSS(externalUrl string) *RSS {
+	return &RSS{
+		ExternalUrl: externalUrl,
+	}
+}
+
 // Generates a podcast RSS feed with the given metadata
-func GeneratePodcastRSSFeed(videos []video.VideoMetadata) string {
+func (r *RSS) GeneratePodcastFeed(videos []video.VideoMetadata) string {
 	channel := PodcastChannel{
 		Title:       "tubefeed",
-		Link:        config.ExternalURL,
+		Link:        r.ExternalUrl,
 		Description: "A collection of YouTube videos as podcast episodes.",
 		Language:    "en-us",
 		Author:      "tubefeed",
-		Image:       PodcastImage{Href: fmt.Sprintf("http://%s/static/logo.png", config.ExternalURL)},
+		Image:       PodcastImage{Href: fmt.Sprintf("http://%s/static/logo.png", r.ExternalUrl)},
 	}
 
 	for _, video := range videos {
 		// Dynamically generate the full YouTube URL using the video ID
 		videoURL := yt.Yturl(video.VideoID)
-		audioURL := fmt.Sprintf("http://%s/audio/%s", config.ExternalURL, video.VideoID) // Stub for audio files
+		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.VideoID) // Stub for audio files
 
 		item := PodcastItem{
 			Title:       fmt.Sprintf("%s - %s", video.Channel, video.Title),

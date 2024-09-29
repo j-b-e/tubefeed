@@ -6,6 +6,7 @@ import (
 )
 
 func main() {
+	app := app.Setup()
 	if err := app.Run(); err != nil {
 		fmt.Println(err)
 	}

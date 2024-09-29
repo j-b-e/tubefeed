@@ -1,7 +1,6 @@
 package app
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,16 +30,32 @@ var (
 	downloadInProgress   sync.Map
 )
 
-// Run main app
-func Run() (err error) {
+type App struct {
+	config      *config.Config
+	rss         *rss.RSS
+	ExternalURL string
+	Db          *db.Database
+}
 
-	config.Db, err = sql.Open("sqlite3", config.DbPath)
+func Setup() App {
+	c := config.Load()
+	externalUrl := fmt.Sprintf("%s:%s", c.Hostname, c.ListenPort)
+	return App{
+		config: c,
+		rss:    rss.NewRSS(externalUrl),
+	}
+}
+
+// Run main app
+func (a App) Run() (err error) {
+
+	a.Db, err = db.NewDatabase(a.config.DbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer config.Db.Close()
+	defer a.Db.Close()
 
-	db.CreateTable()
+	a.Db.CreateTable()
 
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/*")
@@ -48,7 +63,7 @@ func Run() (err error) {
 	r.Static("/static", "./static")
 
 	r.GET("/", func(c *gin.Context) {
-		videos := db.LoadDatabase()
+		videos := a.Db.LoadDatabase()
 		c.HTML(http.StatusOK, "index.html", gin.H{
 			"Videos": videos,
 		})
@@ -63,7 +78,7 @@ func Run() (err error) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		duplicate, err := checkforDuplicate(videoID)
+		duplicate, err := a.Db.CheckforDuplicate(videoID)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -81,30 +96,30 @@ func Run() (err error) {
 		}
 
 		// Save the metadata to the database
-		db.SaveVideoMetadata(videoMetadata)
+		a.Db.SaveVideoMetadata(videoMetadata)
 
 		// Reload the page with the updated video list
-		videos := db.LoadDatabase()
+		videos := a.Db.LoadDatabase()
 		c.HTML(http.StatusOK, "video_list.html", gin.H{
 			"Videos": videos,
 		})
 	})
 
 	// Stream or download audio route
-	r.GET("/audio/:id", streamAudio)
+	r.GET("/audio/:id", a.streamAudio)
 	// Route to delete a video by ID
 	r.DELETE("/audio/:id", func(c *gin.Context) {
 		id := c.Param("id")
 
 		// Delete the video from the database
-		err := deleteVideo(id)
+		err := a.deleteVideo(id)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
 		// Reload the page with the updated video list
-		videos := db.LoadDatabase()
+		videos := a.Db.LoadDatabase()
 		c.HTML(http.StatusOK, "video_list.html", gin.H{
 			"Videos": videos,
 		})
@@ -112,21 +127,21 @@ func Run() (err error) {
 
 	r.GET("/rss", func(c *gin.Context) {
 		// Fetch all videos from the database
-		videos := db.LoadDatabase()
+		videos := a.Db.LoadDatabase()
 
 		// Generate Podcast RSS feed with the video metadata
-		rssfeed := rss.GeneratePodcastRSSFeed(videos)
+		rssfeed := a.rss.GeneratePodcastFeed(videos)
 
 		c.Data(http.StatusOK, "application/xml", []byte(rssfeed))
 	})
 
 	// Start the web server
-	return r.Run(fmt.Sprintf(":%d", config.ListenPort))
+	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
 }
 
-func streamAudio(c *gin.Context) {
+func (a App) streamAudio(c *gin.Context) {
 	audioID := c.Param("id")
-	audioFilePath := filepath.Join(config.AudioPath, fmt.Sprintf("%s.mp3", audioID))
+	audioFilePath := filepath.Join(a.config.AudioPath, fmt.Sprintf("%s.mp3", audioID))
 
 	// Check if the file exists
 	if fileExists(audioFilePath) {
@@ -170,7 +185,11 @@ func streamAudio(c *gin.Context) {
 	if !fileExists(audioFilePath) {
 		go func() {
 			defer audioMutex.Unlock()
-			err := video.DownloadAudioFile(audioID)
+			file := video.VideoMetadata{
+				VideoID:   audioID,
+				AudioPath: a.config.AudioPath,
+			}
+			err := file.Download()
 			if err != nil {
 				log.Println(err)
 				return
@@ -178,26 +197,6 @@ func streamAudio(c *gin.Context) {
 		}()
 	}
 	c.JSON(http.StatusProcessing, gin.H{"msg": "Audio is processing"})
-}
-
-func checkforDuplicate(videoID string) (bool, error) {
-	query := `SELECT count(*) FROM videos WHERE video_id = (?)`
-	rows, err := config.Db.Query(query, videoID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	var length int
-	rows.Next()
-	err = rows.Scan(&length)
-	if err != nil {
-		return true, err
-	}
-	if length == 0 {
-		return false, nil
-	}
-	return true, nil
 }
 
 // Extracts video ID from the provided YouTube URL
@@ -234,13 +233,12 @@ func fetchYouTubeMetadata(videoID string) (video video.VideoMetadata, err error)
 }
 
 // Deletes a video by ID from the database
-func deleteVideo(videoid string) error {
-	query := `DELETE FROM videos WHERE video_id = ?`
-	_, err := config.Db.Exec(query, videoid)
+func (a App) deleteVideo(videoid string) error {
+	err := a.Db.Delete(videoid)
 	if err != nil {
 		return err
 	}
-	err = os.Remove(fmt.Sprintf("%s/%s.mp3", config.AudioPath, videoid))
+	err = os.Remove(fmt.Sprintf("%s/%s.mp3", a.config.AudioPath, videoid))
 	return err
 }
 
