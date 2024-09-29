@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"tubefeed/pkg/cmd"
+	"tubefeed/internal/app"
 )
 
 func main() {
-	if err := cmd.Run(); err != nil {
+	if err := app.Run(); err != nil {
 		fmt.Println(err)
 	}
 }

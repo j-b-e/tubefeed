@@ -1,5 +1,5 @@
 .cache/
 audio/
-config/
+/config/
 yt2pod
 yt.json
