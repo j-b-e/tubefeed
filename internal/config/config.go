@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"tubefeed/internal/provider"
+	"tubefeed/internal/provider/yt"
 )
 
 type Config struct {
@@ -14,7 +16,6 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-
 		ListenPort: GetEnvOrDefault("LISTE_PORT", "8091"),
 		AudioPath:  GetEnvOrDefault("AUDIO_PATH", "./audio/"),
 		DbPath:     "./config/tubefeed.db",
@@ -27,4 +28,12 @@ func GetEnvOrDefault(key, def string) string {
 		return value
 	}
 	return def
+}
+
+func SetupVideoProviders() (p *provider.Provider) {
+	p = &provider.Provider{}
+	p.List = make(provider.VideoProviderList)
+	p.RegisterProvider([]string{"youtube.com"}, yt.New)
+	p.RegisterProvider([]string{"www.youtube.com"}, yt.New)
+	return p
 }

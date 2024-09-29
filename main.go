@@ -1,13 +1,11 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"tubefeed/internal/app"
 )
 
 func main() {
 	app := app.Setup()
-	if err := app.Run(); err != nil {
-		fmt.Println(err)
-	}
+	log.Fatal(app.Run())
 }

@@ -2,11 +2,14 @@ package rss
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"log"
 	"time"
-	"tubefeed/internal/video"
-	"tubefeed/internal/yt"
+	"tubefeed/internal/provider"
 )
+
+var ErrRSS = errors.New("rss error")
 
 // PodcastRSS defines the structure for the podcast RSS XML feed
 type PodcastRSS struct {
@@ -60,7 +63,7 @@ func NewRSS(externalUrl string) *RSS {
 }
 
 // Generates a podcast RSS feed with the given metadata
-func (r *RSS) GeneratePodcastFeed(videos []video.VideoMetadata) string {
+func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider) (string, error) {
 	channel := PodcastChannel{
 		Title:       "tubefeed",
 		Link:        r.ExternalUrl,
@@ -71,20 +74,23 @@ func (r *RSS) GeneratePodcastFeed(videos []video.VideoMetadata) string {
 	}
 
 	for _, video := range videos {
-		// Dynamically generate the full YouTube URL using the video ID
-		videoURL := yt.Yturl(video.VideoID)
-		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.VideoID) // Stub for audio files
+		metadata, err := video.LoadMetadata()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, metadata.VideoID) // Stub for audio files
 
 		item := PodcastItem{
-			Title:       fmt.Sprintf("%s - %s", video.Channel, video.Title),
+			Title:       fmt.Sprintf("%s - %s", metadata.Channel, metadata.Title),
 			Description: "Dummy Description",
 			PubDate:     time.Now().Format("Tue, 15 Sep 2023 19:00:00 GMT"), //"Tue, 15 Sep 2023 19:00:00 GMT",
-			Link:        videoURL,
-			GUID:        videoURL,
+			Link:        video.Url(),
+			GUID:        metadata.VideoID.String(),
 			Enclosure: PodcastEnclosure{
-				URL:    audioURL,                        // Replace this with the actual audio file URL
-				Length: fmt.Sprintf("%d", video.Length), // Stub for the length of the audio file
-				Type:   "audio/mpeg",                    // The type of enclosure
+				URL:    audioURL,                           // Replace this with the actual audio file URL
+				Length: fmt.Sprintf("%d", metadata.Length), // Stub for the length of the audio file
+				Type:   "audio/mpeg",                       // The type of enclosure
 			},
 		}
 		channel.Items = append(channel.Items, item)
@@ -97,5 +103,5 @@ func (r *RSS) GeneratePodcastFeed(videos []video.VideoMetadata) string {
 	}
 
 	output, _ := xml.MarshalIndent(rss, "", "  ")
-	return xml.Header + string(output)
+	return xml.Header + string(output), nil
 }

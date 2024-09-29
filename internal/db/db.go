@@ -2,12 +2,26 @@ package db
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
-	"tubefeed/internal/video"
+	"time"
+	"tubefeed/internal/config"
+	"tubefeed/internal/provider"
+	"tubefeed/internal/utils"
+
+	"github.com/google/uuid"
 )
 
+var ErrDatabase = errors.New("database error")
+
+func dbErr(s any) error {
+	return fmt.Errorf("%w: %v", ErrDatabase, s)
+}
+
 type Database struct {
-	handler *sql.DB
+	handler  *sql.DB
+	provider *provider.Provider
 }
 
 func NewDatabase(path string) (*Database, error) {
@@ -16,55 +30,125 @@ func NewDatabase(path string) (*Database, error) {
 		return nil, err
 	}
 	return &Database{
-		handler: ret,
+		handler:  ret,
+		provider: config.SetupVideoProviders(),
 	}, nil
 }
 
-// Creates the 'videos' table if it doesn't already exist
 func (db *Database) CreateTable() {
 	query := `
 	CREATE TABLE IF NOT EXISTS videos (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		video_id TEXT,
-		title TEXT,
-		channel TEXT,
-		length INT
+		uuid  	 	TEXT PRIMARY KEY,
+		title      	TEXT NOT NULL,
+		channel    	TEXT NOT NULL,
+		status    	TEXT NOT NULL,
+		length     	INTEGER NOT NULL,  -- length is in seconds
+		url        	TEXT NOT NULL
 	);`
 	_, err := db.handler.Exec(query)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(dbErr(err))
 	}
 }
 
-// Fetches all video metadata from the database
-func (db *Database) LoadDatabase() []video.VideoMetadata {
-	query := `SELECT video_id, title, channel, length FROM videos`
+// Fetches all video providers from the database
+func (db *Database) LoadDatabase() ([]provider.VideoProvider, error) {
+	query := `SELECT uuid, title, channel, status, length, url FROM videos`
 	rows, err := db.handler.Query(query)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(dbErr(err))
+		return nil, err
 	}
 	defer rows.Close()
 
-	var videos []video.VideoMetadata
+	var videos []provider.VideoProvider
 	for rows.Next() {
-		var video video.VideoMetadata
-		err := rows.Scan(&video.VideoID, &video.Title, &video.Channel, &video.Length)
+		var videomd provider.VideoMetadata
+		var id string
+		var len int
+		err := rows.Scan(&id, &videomd.Title, &videomd.Channel, &videomd.Status, &len, &videomd.URL)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			return nil, err
 		}
-		video.Status = "unknown"
+		videomd.Length = time.Duration(len) * time.Second
+		videomd.VideoID = uuid.MustParse(id)
+		domain, err := utils.ExtractDomain(videomd.URL)
+		if err != nil {
+			return nil, err
+		}
+		if domain == "" {
+			log.Printf("Domain for '%s' is empty\n", videomd.VideoID)
+			continue
+		}
+		providerSetup, ok := db.provider.List[domain]
+		if !ok {
+			log.Printf("Provider for '%s' not found\n", domain)
+			continue
+		}
+		video, err := providerSetup(videomd)
+		if err != nil {
+			log.Println(fmt.Errorf("Provider %s returned %w", video.Url(), err))
+			continue
+		}
+		video.SetMetadata(&videomd)
 		videos = append(videos, video)
 	}
 
-	return videos
+	return videos, nil
+}
+
+func (db *Database) GetVideo(id uuid.UUID) (provider.VideoProvider, error) {
+	query := `SELECT title, channel, status, length, url FROM videos WHERE uuid = (?)`
+	rows, err := db.handler.Query(query, id.String())
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	videomd := provider.VideoMetadata{
+		VideoID: id,
+	}
+	if !rows.Next() {
+		return nil, ErrDatabase
+	}
+	var len int
+	err = rows.Scan(&videomd.Title, &videomd.Channel, &videomd.Status, &len, &videomd.URL)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	videomd.Length = time.Duration(len) * time.Second
+	domain, err := utils.ExtractDomain(videomd.URL)
+	if err != nil {
+		return nil, err
+	}
+	provider, ok := db.provider.List[domain]
+	if !ok {
+		err = fmt.Errorf("%w: Provider for %s not found", ErrDatabase, domain)
+		log.Println(err)
+		return nil, err
+	}
+	video, err := provider(videomd)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	_, err = video.LoadMetadata()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	return video, nil
+
 }
 
 // Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(video video.VideoMetadata) {
-	query := `INSERT INTO videos (title, channel, video_id, length) VALUES (?, ?, ?, ?)`
-	_, err := db.handler.Exec(query, video.Title, video.Channel, video.VideoID, video.Length)
+func (db *Database) SaveVideoMetadata(video provider.VideoMetadata) {
+	len := video.Length.Seconds()
+	query := `INSERT INTO videos (uuid, title, channel, status, length, url) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := db.handler.Exec(query, video.VideoID, video.Title, video.Channel, video.Status, len, video.URL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(dbErr(err))
 	}
 }
 
@@ -72,11 +156,12 @@ func (db *Database) Close() {
 	db.handler.Close()
 }
 
-func (db *Database) CheckforDuplicate(videoID string) (bool, error) {
-	query := `SELECT count(*) FROM videos WHERE video_id = (?)`
-	rows, err := db.handler.Query(query, videoID)
+func (db *Database) CheckforDuplicate(video provider.VideoProvider) (bool, error) {
+	query := `SELECT count(*) FROM videos WHERE url = (?)`
+	rows, err := db.handler.Query(query, video.Url())
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return false, err
 	}
 	defer rows.Close()
 
@@ -92,9 +177,9 @@ func (db *Database) CheckforDuplicate(videoID string) (bool, error) {
 	return true, nil
 }
 
-func (db *Database) Delete(videoid string) error {
-	query := `DELETE FROM videos WHERE video_id = ?`
-	_, err := db.handler.Exec(query, videoid)
+func (db *Database) Delete(id uuid.UUID) error {
+	query := `DELETE FROM videos WHERE uuid = ?`
+	_, err := db.handler.Exec(query, id)
 	if err != nil {
 		return err
 	}

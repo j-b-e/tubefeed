@@ -1,24 +1,22 @@
 package app
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
+	"tubefeed/internal/provider"
 	"tubefeed/internal/rss"
-	"tubefeed/internal/video"
-	"tubefeed/internal/yt"
+	"tubefeed/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -31,18 +29,20 @@ var (
 )
 
 type App struct {
-	config      *config.Config
-	rss         *rss.RSS
-	ExternalURL string
-	Db          *db.Database
+	config        *config.Config
+	rss           *rss.RSS
+	ExternalURL   string
+	Db            *db.Database
+	videoProvider *provider.Provider
 }
 
 func Setup() App {
 	c := config.Load()
 	externalUrl := fmt.Sprintf("%s:%s", c.Hostname, c.ListenPort)
 	return App{
-		config: c,
-		rss:    rss.NewRSS(externalUrl),
+		config:        c,
+		rss:           rss.NewRSS(externalUrl),
+		videoProvider: config.SetupVideoProviders(),
 	}
 }
 
@@ -63,22 +63,50 @@ func (a App) Run() (err error) {
 	r.Static("/static", "./static")
 
 	r.GET("/", func(c *gin.Context) {
-		videos := a.Db.LoadDatabase()
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"Videos": videos,
-		})
-	})
-
-	// Add a new video by fetching its metadata
-	r.POST("/audio", func(c *gin.Context) {
-		youtubeURL := c.PostForm("youtube_url")
-		videoID, err := extractVideoID(youtubeURL)
+		videos, err := a.Db.LoadDatabase()
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		duplicate, err := a.Db.CheckforDuplicate(videoID)
+		var videometa []provider.VideoMetadata
+		for _, video := range videos {
+			meta, err := video.LoadMetadata()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			videometa = append(videometa, *meta)
+
+		}
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"Videos": videometa,
+		})
+	})
+
+	// Add a new video by fetching its metadata
+	r.POST("/audio", func(c *gin.Context) {
+		videoURL := c.PostForm("youtube_url")
+		domain, err := utils.ExtractDomain(videoURL)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		providerSetup, ok := a.videoProvider.List[domain]
+		if !ok {
+			resp := fmt.Sprintf("No provider for %s found", domain)
+			log.Println(resp)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, resp)
+			return
+		}
+		vid, err := providerSetup(provider.VideoMetadata{VideoID: uuid.New(), URL: videoURL})
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		duplicate, err := a.Db.CheckforDuplicate(vid)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -88,7 +116,7 @@ func (a App) Run() (err error) {
 			c.JSON(http.StatusConflict, gin.H{"conflict": "Audio already present"})
 			return
 		}
-		videoMetadata, err := fetchYouTubeMetadata(videoID)
+		videoMetadata, err := vid.LoadMetadata()
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -96,12 +124,26 @@ func (a App) Run() (err error) {
 		}
 
 		// Save the metadata to the database
-		a.Db.SaveVideoMetadata(videoMetadata)
+		a.Db.SaveVideoMetadata(*videoMetadata)
 
 		// Reload the page with the updated video list
-		videos := a.Db.LoadDatabase()
+		videos, err := a.Db.LoadDatabase()
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		var videometa []provider.VideoMetadata
+		for _, v := range videos {
+			meta, err := v.LoadMetadata()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			videometa = append(videometa, *meta)
+		}
 		c.HTML(http.StatusOK, "video_list.html", gin.H{
-			"Videos": videos,
+			"Videos": videometa,
 		})
 	})
 
@@ -109,28 +151,57 @@ func (a App) Run() (err error) {
 	r.GET("/audio/:id", a.streamAudio)
 	// Route to delete a video by ID
 	r.DELETE("/audio/:id", func(c *gin.Context) {
-		id := c.Param("id")
+		id, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusBadRequest, err)
+			return
+		}
 
 		// Delete the video from the database
-		err := a.deleteVideo(id)
+		err = a.deleteVideo(id)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
 		// Reload the page with the updated video list
-		videos := a.Db.LoadDatabase()
+		videos, err := a.Db.LoadDatabase()
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		var videometa []provider.VideoMetadata
+		for _, v := range videos {
+			meta, err := v.LoadMetadata()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			videometa = append(videometa, *meta)
+		}
 		c.HTML(http.StatusOK, "video_list.html", gin.H{
-			"Videos": videos,
+			"Videos": videometa,
 		})
 	})
 
 	r.GET("/rss", func(c *gin.Context) {
 		// Fetch all videos from the database
-		videos := a.Db.LoadDatabase()
+		videos, err := a.Db.LoadDatabase()
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
 
 		// Generate Podcast RSS feed with the video metadata
-		rssfeed := a.rss.GeneratePodcastFeed(videos)
+		rssfeed, err := a.rss.GeneratePodcastFeed(videos)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
 
 		c.Data(http.StatusOK, "application/xml", []byte(rssfeed))
 	})
@@ -141,6 +212,12 @@ func (a App) Run() (err error) {
 
 func (a App) streamAudio(c *gin.Context) {
 	audioID := c.Param("id")
+	audioUUID, err := uuid.Parse(audioID)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, err)
+		return
+	}
 	audioFilePath := filepath.Join(a.config.AudioPath, fmt.Sprintf("%s.mp3", audioID))
 
 	// Check if the file exists
@@ -164,6 +241,7 @@ func (a App) streamAudio(c *gin.Context) {
 	// Check if a download is already in progress
 	if inProgress, _ := downloadInProgress.Load(audioID); inProgress == true {
 		// Return early with a message indicating the download is in progress
+		log.Printf("download of id %s in progress\n", audioID)
 		c.JSON(http.StatusProcessing, gin.H{"message": "Audio download in progress, please try again later"})
 		return
 	}
@@ -183,13 +261,22 @@ func (a App) streamAudio(c *gin.Context) {
 	audioMutex.Lock()
 
 	if !fileExists(audioFilePath) {
+		video, err := a.Db.GetVideo(audioUUID)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		_, err = video.LoadMetadata()
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+
 		go func() {
 			defer audioMutex.Unlock()
-			file := video.VideoMetadata{
-				VideoID:   audioID,
-				AudioPath: a.config.AudioPath,
-			}
-			err := file.Download()
+			err := video.Download(audioFilePath)
 			if err != nil {
 				log.Println(err)
 				return
@@ -199,46 +286,17 @@ func (a App) streamAudio(c *gin.Context) {
 	c.JSON(http.StatusProcessing, gin.H{"msg": "Audio is processing"})
 }
 
-// Extracts video ID from the provided YouTube URL
-func extractVideoID(url string) (string, error) {
-	if strings.Contains(url, "v=") {
-		parts := strings.Split(url, "v=")
-		return strings.Split(parts[1], "&")[0], nil
-	}
-	return "", errors.New("No video URL")
-}
-
-// Fetches YouTube video metadata
-func fetchYouTubeMetadata(videoID string) (video video.VideoMetadata, err error) {
-	cmd := exec.Command("yt-dlp", "--quiet", "--skip-download", "--dump-json", yt.Yturl(videoID))
-	out, err := cmd.Output()
-	if err != nil {
-		log.Println(err)
-		return video, err
-	}
-	var result map[string]any
-	err = json.Unmarshal([]byte(out), &result)
-	if err != nil {
-		return video, err
-	}
-
-	if result["id"] != videoID {
-		return video, errors.New("video id from result didnt match")
-	}
-	video.Title = result["title"].(string)
-	video.Channel = result["uploader"].(string)
-	video.Length = int(result["duration"].(float64))
-	video.VideoID = videoID
-	return video, nil
-}
-
 // Deletes a video by ID from the database
-func (a App) deleteVideo(videoid string) error {
-	err := a.Db.Delete(videoid)
+func (a App) deleteVideo(id uuid.UUID) error {
+	err := a.Db.Delete(id)
 	if err != nil {
 		return err
 	}
-	err = os.Remove(fmt.Sprintf("%s/%s.mp3", a.config.AudioPath, videoid))
+	file := fmt.Sprintf("%s/%s.mp3", a.config.AudioPath, id)
+	err = os.Remove(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	return err
 }
 
