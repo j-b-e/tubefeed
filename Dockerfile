@@ -14,12 +14,14 @@ RUN go build -o main .
 
 FROM alpine:latest
 
-RUN apk --no-cache add sqlite sqlite-libs ffmpeg yt-dlp
+RUN apk --no-cache add curl python3 sqlite sqlite-libs ffmpeg
 WORKDIR /app
+RUN mkdir -p ./.cache ./audio
 COPY --from=builder /app/main .
 COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/static ./static
-RUN mkdir -p ./.cache ./audio
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod +x /usr/local/bin/yt-dlp
 
 EXPOSE 8091
 
