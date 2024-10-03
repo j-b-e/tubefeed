@@ -18,6 +18,8 @@ RUN apk --no-cache add sqlite sqlite-libs ffmpeg yt-dlp
 WORKDIR /app
 COPY --from=builder /app/main .
 COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/static ./static
+RUN mkdir -p ./.cache ./audio
 
 EXPOSE 8091
 
