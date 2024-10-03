@@ -179,9 +179,21 @@ func (a App) Run() (err error) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-
+		tabs, err := a.Db.LoadTabs()
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		tabname, ok := tabs[id]
+		if !ok {
+			err = fmt.Errorf("failed to get tabname for id %d", id)
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
 		// Generate Podcast RSS feed with the video metadata
-		rssfeed, err := a.rss.GeneratePodcastFeed(videos)
+		rssfeed, err := a.rss.GeneratePodcastFeed(videos, tabname)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)

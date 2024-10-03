@@ -63,13 +63,13 @@ func NewRSS(externalUrl string) *RSS {
 }
 
 // Generates a podcast RSS feed with the given metadata
-func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider) (string, error) {
+func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider, tabname string) (string, error) {
 	channel := PodcastChannel{
-		Title:       "tubefeed",
+		Title:       fmt.Sprintf("%s - Tubefeed", tabname),
 		Link:        r.ExternalUrl,
-		Description: "A collection of YouTube videos as podcast episodes.",
+		Description: "A collection of videos as podcast episodes.",
 		Language:    "en-us",
-		Author:      "tubefeed",
+		Author:      "Tubefeed",
 		Image:       PodcastImage{Href: fmt.Sprintf("http://%s/static/logo.png", r.ExternalUrl)},
 	}
 
@@ -83,7 +83,7 @@ func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider) (string, erro
 
 		item := PodcastItem{
 			Title:       fmt.Sprintf("%s - %s", metadata.Channel, metadata.Title),
-			Description: "Dummy Description",
+			Description: fmt.Sprintf("created with Tubefeed on playlist %s", tabname),
 			PubDate:     time.Now().Format("Tue, 15 Sep 2023 19:00:00 GMT"), //"Tue, 15 Sep 2023 19:00:00 GMT",
 			Link:        video.Url(),
 			GUID:        metadata.VideoID.String(),

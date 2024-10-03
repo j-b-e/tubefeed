@@ -15,3 +15,4 @@ Go to http://localhost:8091
 
 * Uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to create an Audio file from Youtube and adds it to the Feed
 * Starts audio extraction on demand
+* Organize your Podcasts in multiple lists
