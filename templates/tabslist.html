@@ -1,0 +1,9 @@
+<!-- tabslist -->
+{{ range $key, $value := .Tabs }}
+    <div class="tab{{ if eq $key 1 }} active{{ end }}" hx-get="/tab/{{ $key }}" hx-trigger="click" hx-target="#content" hx-swap="innerHTML">
+        {{ $value }}
+    </div>
+{{ end }}
+    <!-- Plus button for adding new tabs -->
+    <button class="plus-button" id="add-tab" hx-post="/create-tab" hx-trigger="click" hx-vals="{ 'tabCount': 4 }">+</button>
+<!-- /tabslist -->

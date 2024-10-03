@@ -4,13 +4,26 @@
         Your browser does not support the audio element.
       </audio>
     </td>
+    <td class="name-column">
+        {{ .Channel }} - {{ .Title }}
+    </td>
     <td>
-        {{ .Channel }} - {{ .Title }} ({{ .VideoID }})
+        <div class="info-icon">
+            ℹ️
+            <div class="info-window">
+                {{ .VideoID }}
+            </div>
+        </div>
+        <div class="info-icon">
+            <a href="{{ .URL }}" target="_blank">▶️</a>
+            <div class="info-window">{{ .URL }}</div>
+        </div>
+        </div>
     </td>
     <td>
         {{ .Status }}
     </td>
     <td>
-        <button hx-delete="/audio/{{ .VideoID }}" hx-target="#video-list" hx-swap="outerHTML swap:1s">Delete</button>
+        <button class="delete-button" hx-delete="/audio/{{ .VideoID }}" hx-target="#audio-{{ .VideoID }}" hx-swap="outerHTML swap:1s">Delete</button>
     </td>
 </tr>

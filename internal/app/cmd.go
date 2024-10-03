@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
@@ -63,23 +64,21 @@ func (a App) Run() (err error) {
 	r.Static("/static", "./static")
 
 	r.GET("/", func(c *gin.Context) {
-		videos, err := a.Db.LoadDatabase()
+		tabs, err := a.Db.LoadTabs()
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		var videometa []provider.VideoMetadata
-		for _, video := range videos {
-			meta, err := video.LoadMetadata()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			videometa = append(videometa, *meta)
-
+		videometa, err := a.loadVideoMeta(1)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
 		}
 		c.HTML(http.StatusOK, "index.html", gin.H{
+			"tab":    1,
+			"Tabs":   tabs,
 			"Videos": videometa,
 		})
 	})
@@ -87,6 +86,12 @@ func (a App) Run() (err error) {
 	// Add a new video by fetching its metadata
 	r.POST("/audio", func(c *gin.Context) {
 		videoURL := c.PostForm("youtube_url")
+		tabid, err := strconv.Atoi(c.PostForm("tab"))
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
 		domain, err := utils.ExtractDomain(videoURL)
 		if err != nil {
 			log.Println(err)
@@ -106,7 +111,7 @@ func (a App) Run() (err error) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		duplicate, err := a.Db.CheckforDuplicate(vid)
+		duplicate, err := a.Db.CheckforDuplicate(vid, tabid)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -127,21 +132,13 @@ func (a App) Run() (err error) {
 		a.Db.SaveVideoMetadata(*videoMetadata)
 
 		// Reload the page with the updated video list
-		videos, err := a.Db.LoadDatabase()
+		videometa, err := a.loadVideoMeta(tabid)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		var videometa []provider.VideoMetadata
-		for _, v := range videos {
-			meta, err := v.LoadMetadata()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			videometa = append(videometa, *meta)
-		}
+
 		c.HTML(http.StatusOK, "video_list.html", gin.H{
 			"Videos": videometa,
 		})
@@ -165,30 +162,18 @@ func (a App) Run() (err error) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		// Reload the page with the updated video list
-		videos, err := a.Db.LoadDatabase()
+		c.Status(http.StatusOK)
+	})
+
+	r.GET("/rss/:id", func(c *gin.Context) {
+		// Fetch all videos from the database
+		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		var videometa []provider.VideoMetadata
-		for _, v := range videos {
-			meta, err := v.LoadMetadata()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			videometa = append(videometa, *meta)
-		}
-		c.HTML(http.StatusOK, "video_list.html", gin.H{
-			"Videos": videometa,
-		})
-	})
-
-	r.GET("/rss", func(c *gin.Context) {
-		// Fetch all videos from the database
-		videos, err := a.Db.LoadDatabase()
+		videos, err := a.Db.LoadDatabase(id)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -205,6 +190,8 @@ func (a App) Run() (err error) {
 
 		c.Data(http.StatusOK, "application/xml", []byte(rssfeed))
 	})
+
+	r.GET("/tab/:id", a.handletab)
 
 	// Start the web server
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
@@ -303,4 +290,72 @@ func (a App) deleteVideo(id uuid.UUID) error {
 func fileExists(filePath string) bool {
 	_, err := os.Stat(filePath)
 	return !errors.Is(err, fs.ErrNotExist)
+}
+
+func (a App) handletab(c *gin.Context) {
+	tabID := c.Param("id")
+	if tabID == "" || tabID == "1" {
+		videos, err := a.Db.LoadDatabase(1)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		var videometa []provider.VideoMetadata
+		for _, video := range videos {
+			meta, err := video.LoadMetadata()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			videometa = append(videometa, *meta)
+
+		}
+		if tabID == "" {
+			c.HTML(http.StatusOK, "index.html", gin.H{
+				"Videos": videometa,
+				"tab":    1,
+			})
+		} else {
+			c.HTML(http.StatusOK, "tabcontent.html", gin.H{
+				"Videos": videometa,
+				"tab":    1,
+			})
+		}
+
+	} else {
+		tabIDi, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		videometa, err := a.loadVideoMeta(tabIDi)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
+		c.HTML(http.StatusOK, "tabcontent.html", gin.H{
+			"Videos": videometa,
+			"tab":    tabIDi,
+		})
+	}
+}
+
+func (a App) loadVideoMeta(tab int) ([]provider.VideoMetadata, error) {
+	videos, err := a.Db.LoadDatabase(tab)
+	if err != nil {
+		return nil, err
+	}
+	var videometa []provider.VideoMetadata
+	for _, v := range videos {
+		meta, err := v.LoadMetadata()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		videometa = append(videometa, *meta)
+	}
+	return videometa, nil
 }

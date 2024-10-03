@@ -11,26 +11,168 @@
         opacity: 0;
         transition: opacity 1s ease-out;
         }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .tabs {
+            display: flex;
+            cursor: pointer;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .tab {
+            padding: 10px 20px;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            margin-right: 10px;
+            background-color: #f1f1f1;
+            display: flex;
+            align-items: center;
+        }
+        .tab.active {
+            background-color: #ffffff;
+            border-bottom: 1px solid white;
+        }
+        .plus-button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            border: none;
+            font-size: 18px;
+        }
+        .content {
+            padding: 20px;
+            border: 1px solid #ccc;
+        }
+        .delete-button {
+            color: white;
+            background-color: #dc3545;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+                /* Style for the info icon */
+        .info-icon {
+            cursor: pointer;
+            position: relative;
+        }
+        /* Style for the floating info window */
+        .info-window {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            width: 200px;
+            z-index: 10;
+            top: 20px;
+            left: -10px;
+        }
+        /* Show the info window when hovering over the icon */
+        .info-icon:hover .info-window {
+            display: block;
+        }
+
+        /* Fixed width for the name column */
+        .name-column {
+            width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+        }
+        .name-column:hover .full-name-window {
+            display: block;
+        }
+        /* Floating window for the full name */
+        .full-name-window {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            top: 20px;
+            left: 0;
+            width: max-content;
+            max-width: 300px;
+        }
+        .delete-button {
+            color: white;
+            background-color: #dc3545;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .name-column {
+            width: 50%; /* Fixed width for Name column */
+            word-wrap: break-word; /* Ensures long words break into new lines */
+        }
+
     </style>
 </head>
 <body>
     <h1>Tubefeed</h1>
 
-    <p>Copy this link into your Podcast App: <a href="./rss">RSS-Feed</a></p>
-    <h2>Add a Youtube Video</h2>
-    <form hx-post="/audio" hx-target="#video-list">
-        <label for="youtube_url">YouTube URL:</label>
-        <input type="text" id="youtube_url" name="youtube_url" required>
-        <button type="submit" hx-indicator="#indicator">Add Video</button>
-    </form>
-
-    <h2>Playlist</h2>
-    <div id="video-list">
-    {{ template "video_list.html" . }}
+    <div class="tabs" id="tabs-container">
+        {{ template "tabslist.html" . }}
     </div>
-    <script>
+    <div id="content" class="content">
+        {{ template "tabcontent.html" . }}
+    </div>
 
-    </script>
+
+
+<script>
+    let tabCount = {{ len .Tabs }}; // Number of initial tabs
+
+
+    // Function to add a new tab
+    function addNewTab(tabNumber) {
+        const newTab = document.createElement('div');
+        newTab.className = 'tab';
+        newTab.setAttribute('hx-get', `/tab${tabNumber}`);
+        newTab.setAttribute('hx-trigger', 'click');
+        newTab.setAttribute('hx-target', '#content');
+        newTab.setAttribute('hx-swap', 'innerHTML');
+
+        // Tab name span with rename functionality
+        const tabNameSpan = document.createElement('span');
+        tabNameSpan.className = 'tab-name';
+        tabNameSpan.textContent = `Tab ${tabNumber}`;
+        tabNameSpan.onclick = function() {
+            renameTab(tabNameSpan, tabNumber);
+        };
+
+        newTab.appendChild(tabNameSpan);
+
+        // Insert the new tab before the plus button
+        document.getElementById('tabs-container').insertBefore(newTab, document.getElementById('add-tab'));
+        document.getElementById('add-tab').setAttribute('hx-vals', JSON.stringify({ tabCount: tabNumber + 1 }));
+    }
+
+    // Listen for HTMX response after the backend call to add a new tab
+    document.addEventListener('htmx:afterOnLoad', function(event) {
+        if (event.detail.elt.id === 'add-tab') {
+            if (event.detail.xhr.status === 200) {
+                tabCount++;
+                addNewTab(tabCount);
+            }
+        }
+    });
+
+    // Manage active class on tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+</script>
 
 </body>
 </html>

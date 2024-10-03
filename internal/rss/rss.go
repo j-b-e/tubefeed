@@ -88,9 +88,9 @@ func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider) (string, erro
 			Link:        video.Url(),
 			GUID:        metadata.VideoID.String(),
 			Enclosure: PodcastEnclosure{
-				URL:    audioURL,                           // Replace this with the actual audio file URL
-				Length: fmt.Sprintf("%d", metadata.Length), // Stub for the length of the audio file
-				Type:   "audio/mpeg",                       // The type of enclosure
+				URL:    audioURL,                                     // Replace this with the actual audio file URL
+				Length: fmt.Sprintf("%f", metadata.Length.Seconds()), // size in bytes of the audio file
+				Type:   "audio/mpeg",                                 // The type of enclosure
 			},
 		}
 		channel.Items = append(channel.Items, item)

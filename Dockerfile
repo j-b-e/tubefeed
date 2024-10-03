@@ -21,4 +21,4 @@ COPY --from=builder /app/templates ./templates
 
 EXPOSE 8091
 
-CMD ["./app"]
+CMD ["./main"]

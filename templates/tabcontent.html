@@ -1,0 +1,13 @@
+<p>Copy this link into your Podcast App: <a href="./rss/{{ .tab }}">RSS-Feed</a></p>
+<h2>Add a Youtube Video</h2>
+<form hx-post="/audio" hx-target="#video-list">
+    <label for="youtube_url">YouTube URL:</label>
+    <input type="text" id="youtube_url" name="youtube_url" required>
+    <input type="hidden" id="tab" name="tab" value="{{ .tab }}">
+    <button type="submit" hx-indicator="#indicator">Add Video</button>
+</form>
+
+<h2>Playlist</h2>
+<div id="video-list">
+{{ template "video_list.html" . }}
+</div>

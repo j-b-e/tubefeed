@@ -36,6 +36,12 @@ func NewDatabase(path string) (*Database, error) {
 }
 
 func (db *Database) CreateTable() {
+	log.Println("Creating Tables")
+	db.createTabTable()
+	db.createVideoTable()
+}
+
+func (db *Database) createVideoTable() {
 	query := `
 	CREATE TABLE IF NOT EXISTS videos (
 		uuid  	 	TEXT PRIMARY KEY,
@@ -43,7 +49,10 @@ func (db *Database) CreateTable() {
 		channel    	TEXT NOT NULL,
 		status    	TEXT NOT NULL,
 		length     	INTEGER NOT NULL,  -- length is in seconds
-		url        	TEXT NOT NULL
+		size		INTEGER,  -- size is in bytes
+		url        	TEXT NOT NULL,
+		tab			INTEGER,
+		FOREIGN KEY(tab) REFERENCES tabs(id)
 	);`
 	_, err := db.handler.Exec(query)
 	if err != nil {
@@ -51,10 +60,23 @@ func (db *Database) CreateTable() {
 	}
 }
 
+func (db *Database) createTabTable() {
+	query := `
+	CREATE TABLE IF NOT EXISTS tabs (
+		id  	 	INTEGER PRIMARY KEY,
+		name      	TEXT NOT NULL
+	);
+	INSERT OR IGNORE INTO tabs (id,  name) VALUES (1, "Tab 1");`
+	_, err := db.handler.Exec(query)
+	if err != nil {
+		log.Fatal(dbErr(err))
+	}
+}
+
 // Fetches all video providers from the database
-func (db *Database) LoadDatabase() ([]provider.VideoProvider, error) {
-	query := `SELECT uuid, title, channel, status, length, url FROM videos`
-	rows, err := db.handler.Query(query)
+func (db *Database) LoadDatabase(tab int) ([]provider.VideoProvider, error) {
+	query := `SELECT uuid, title, channel, status, length, url FROM videos WHERE tab=(?)`
+	rows, err := db.handler.Query(query, tab)
 	if err != nil {
 		log.Println(dbErr(err))
 		return nil, err
@@ -145,8 +167,8 @@ func (db *Database) GetVideo(id uuid.UUID) (provider.VideoProvider, error) {
 // Saves video metadata to the database
 func (db *Database) SaveVideoMetadata(video provider.VideoMetadata) {
 	len := video.Length.Seconds()
-	query := `INSERT INTO videos (uuid, title, channel, status, length, url) VALUES (?, ?, ?, ?, ?, ?)`
-	_, err := db.handler.Exec(query, video.VideoID, video.Title, video.Channel, video.Status, len, video.URL)
+	query := `INSERT INTO videos (uuid, title, channel, status, length, url, tab) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.handler.Exec(query, video.VideoID, video.Title, video.Channel, video.Status, len, video.URL, 1) // TODO: use real tabid
 	if err != nil {
 		log.Fatal(dbErr(err))
 	}
@@ -156,9 +178,9 @@ func (db *Database) Close() {
 	db.handler.Close()
 }
 
-func (db *Database) CheckforDuplicate(video provider.VideoProvider) (bool, error) {
-	query := `SELECT count(*) FROM videos WHERE url = (?)`
-	rows, err := db.handler.Query(query, video.Url())
+func (db *Database) CheckforDuplicate(video provider.VideoProvider, tabid int) (bool, error) {
+	query := `SELECT count(*) FROM videos WHERE url = (?) and tab = (?)`
+	rows, err := db.handler.Query(query, video.Url(), tabid)
 	if err != nil {
 		log.Println(err)
 		return false, err
@@ -184,4 +206,25 @@ func (db *Database) Delete(id uuid.UUID) error {
 		return err
 	}
 	return nil
+}
+
+func (db *Database) LoadTabs() (map[int]string, error) {
+	query := `SELECT * FROM tabs`
+	rows, err := db.handler.Query(query)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	defer rows.Close()
+	var id int
+	var name string
+	tabs := make(map[int]string)
+	for rows.Next() {
+		err = rows.Scan(&id, &name)
+		if err != nil {
+			return nil, err
+		}
+		tabs[id] = name
+	}
+	return tabs, nil
 }
