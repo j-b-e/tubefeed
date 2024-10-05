@@ -1,0 +1,7 @@
+<div id="tab-{{ .Tab}}" class="tab active">
+    <form hx-patch="/tab/{{ .Tab }}" hx-target="#tabs-container" hx-swap="innerHTML">
+        <input type="text" name="name" value="{{ .Name }}">
+        <button type="submit" class="ok-button">✅</button>
+        <button class="cancel-button" hx-get="/tab?active={{ .Tab }}" hx-target="#tabs-container" hx-swap="innerHTML">❌</button>
+    </form>
+</div>

@@ -203,7 +203,10 @@ func (a App) Run() (err error) {
 		c.Data(http.StatusOK, "application/xml", []byte(rssfeed))
 	})
 
+	r.GET("/tab", a.tablist)
 	r.GET("/tab/:id", a.handletab)
+	r.PATCH("/tab/:id", a.patchtab)
+	r.GET("/tab/edit/:id", a.edittab)
 
 	// Start the web server
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
@@ -370,4 +373,62 @@ func (a App) loadVideoMeta(tab int) ([]provider.VideoMetadata, error) {
 		videometa = append(videometa, *meta)
 	}
 	return videometa, nil
+}
+
+// GET /tab/:id
+func (a App) edittab(c *gin.Context) {
+	tabid, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	tabs, err := a.Db.LoadTabs()
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.HTML(http.StatusOK, "tabedit.html", gin.H{"Tab": tabid, "Name": tabs[tabid]})
+}
+
+// PATCH /tab/:id
+func (a App) patchtab(c *gin.Context) {
+	tabid, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+
+	newname := c.PostForm("name")
+	log.Printf("newname: %s", newname)
+
+	err = a.Db.ChangeTabName(tabid, newname)
+	if err != nil {
+		// ignore err, old name will be reused
+		log.Println(err)
+	}
+	tabs, err := a.Db.LoadTabs()
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.HTML(http.StatusOK, "tablist.html", gin.H{"Tabs": tabs, "tab": tabid})
+}
+
+// GET /tab
+func (a App) tablist(c *gin.Context) {
+	active, err := strconv.Atoi(c.Query("active"))
+	if err != nil {
+		active = 1
+	}
+	tabs, err := a.Db.LoadTabs()
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.HTML(http.StatusOK, "tablist.html", gin.H{"Tabs": tabs, "tab": active})
 }

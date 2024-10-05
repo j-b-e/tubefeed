@@ -228,3 +228,11 @@ func (db *Database) LoadTabs() (map[int]string, error) {
 	}
 	return tabs, nil
 }
+func (db *Database) ChangeTabName(id int, name string) error {
+	query := `UPDATE tabs SET name=(?) WHERE id=(?)`
+	_, err := db.handler.Exec(query, name, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}

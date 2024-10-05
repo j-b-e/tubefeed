@@ -16,7 +16,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		ListenPort: GetEnvOrDefault("LISTE_PORT", "8091"),
+		ListenPort: GetEnvOrDefault("LISTEN_PORT", "8091"),
 		AudioPath:  GetEnvOrDefault("AUDIO_PATH", "./audio/"),
 		DbPath:     "./config/tubefeed.db",
 		Hostname:   GetEnvOrDefault("HOSTNAME", "localhost"),

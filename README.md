@@ -13,6 +13,6 @@ Go to http://localhost:8091
 
 ## Features
 
-* Uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to create an Audio file from Youtube and adds it to the Feed
-* Starts audio extraction on demand
+* Creates an audio-only Podcast Feed from Youtube Videos
 * Organize your Podcasts in multiple lists
+* Uses htmx for a smooth and modern experience

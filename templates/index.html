@@ -108,6 +108,29 @@
             padding: 5px 10px;
             cursor: pointer;
         }
+        .edit-button {
+            margin-left: 10px; /* Spacing between the tab name and the edit button */
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #007bff; /* Blue color for the edit button */
+            /*visibility: hidden; /* Hidden by default, shown on hover */
+            /*position: absolute;*/
+            right: 5px; /* Position the edit button to the right of the tab */
+        }
+        .ok-button, .cancel-button {
+            /*margin-left: 5px;*/
+            border: none;
+            /*padding: 3px 8px;*/
+            background-color: white;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .cancel-button {
+            /*background-color: #dc3545; /* Red for cancel */
+        }
         .name-column {
             width: 50%; /* Fixed width for Name column */
             word-wrap: break-word; /* Ensures long words break into new lines */
@@ -116,19 +139,107 @@
     </style>
 </head>
 <body>
-    <h1>Tubefeed</h1>
+<h1>Tubefeed</h1>
 
+<nav>
     <div class="tabs" id="tabs-container">
-        {{ template "tabslist.html" . }}
+        {{ template "tablist.html" . }}
     </div>
+</nav>
+<div>
     <div id="content" class="content">
         {{ template "tabcontent.html" . }}
     </div>
+</div>
 
 
 
 <script>
-    let tabCount = {{ len .Tabs }}; // Number of initial tabs
+        function startEditTab(tabId) {
+        const tabNameElement = document.getElementById(`tab-${tabId}`);
+        const currentTabName = tabNameElement.textContent;
+
+        // Create an input field to replace the tab name
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.value = currentTabName;
+        inputField.setAttribute('id', `input-${tabId}`);
+        //inputField.style.marginRight = '10px';
+
+        // Replace the tab name with the input field
+        tabNameElement.replaceWith(inputField);
+
+        // Locate the edit button and replace it with OK and Cancel buttons
+        const editButton = document.querySelector(`#tab-${tabId} ~ .edit-button`);
+
+        const okButton = document.createElement('button');
+        okButton.textContent = "OK";
+        okButton.classList.add('ok-button');
+        okButton.onclick = function() { submitEdit(tabId); };
+
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = "X";
+        cancelButton.classList.add('cancel-button');
+        cancelButton.onclick = function() { cancelEdit(tabId, currentTabName); };
+
+        // Insert the OK and Cancel buttons
+        editButton.replaceWith(okButton);
+        okButton.after(cancelButton);
+    }
+
+    function submitEdit(tabId) {
+        const inputField = document.getElementById(`input-${tabId}`);
+        const newTabName = inputField.value;
+
+        // Send a PATCH request to rename the tab
+        htmx.ajax('PATCH', `/tab/${tabId}`, { newName: newTabName })
+            .then(function(response) {
+                if (response.status === 200) {
+                    const tabNameElement = document.createElement('span');
+                    tabNameElement.textContent = newTabName;
+                    tabNameElement.id = `tab-${tabId}`;
+                    tabNameElement.onclick = function() { startEditTab(tabId); };
+
+                    // Replace the input field with the new tab name
+                    inputField.replaceWith(tabNameElement);
+
+                    // Restore the edit button
+                    const okButton = document.querySelector(`#input-${tabId} ~ .ok-button`);
+                    const cancelButton = document.querySelector(`#input-${tabId} ~ .cancel-button`);
+                    const editButton = document.createElement('button');
+                    editButton.classList.add('edit-button');
+                    editButton.onclick = function() { startEditTab(tabId); };
+                    tabNameElement.after(editButton);
+                    okButton.remove();
+                    cancelButton.remove();
+                } else {
+                    alert("Failed to update tab name.");
+                }
+            });
+    }
+
+    function cancelEdit(tabId, originalTabName) {
+        const inputField = document.getElementById(`input-${tabId}`);
+
+        // Restore the original tab name
+        const tabNameElement = document.createElement('span');
+        tabNameElement.textContent = originalTabName;
+        tabNameElement.id = `tab-${tabId}`;
+        tabNameElement.onclick = function() { startEditTab(tabId); };
+
+        inputField.replaceWith(tabNameElement);
+
+        // Restore the edit button
+        const okButton = document.querySelector(`#input-${tabId} ~ .ok-button`);
+        const cancelButton = document.querySelector(`#input-${tabId} ~ .cancel-button`);
+        const editButton = document.createElement('button');
+        editButton.classList.add('edit-button');
+        editButton.onclick = function() { startEditTab(tabId); };
+        tabNameElement.after(editButton);
+        okButton.remove();
+        cancelButton.remove();
+    }
+    let tabCount = {{ len .Tabs }};
 
 
     // Function to add a new tab
@@ -165,13 +276,16 @@
         }
     });
 
-    // Manage active class on tabs
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-        });
-    });
+    function switchTab(t) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('button.edit-button').forEach(b => b.style.visibility = 'hidden');
+        button = t.querySelector('button.edit-button')
+        if (button) {
+            button.style.visibility = 'visible';
+        }
+        t.classList.add('active');
+
+    }
 </script>
 
 </body>
