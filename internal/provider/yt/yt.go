@@ -31,6 +31,11 @@ func New(vm provider.VideoMetadata) (provider.VideoProvider, error) {
 	if !strings.Contains(vm.URL, "youtube.com") {
 		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, vm.URL)
 	}
+	ytid, err := extractVideoID(vm.URL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, vm.URL)
+	}
+	vm.URL = url(ytid)
 	return &yt{meta: vm}, nil
 }
 
