@@ -293,7 +293,7 @@ func (a App) streamAudio(c *gin.Context) {
 
 // Deletes a video by ID from the database
 func (a App) deleteVideo(id uuid.UUID) error {
-	err := a.Db.Delete(id)
+	err := a.Db.DeleteVideo(id)
 	if err != nil {
 		return err
 	}
@@ -460,6 +460,7 @@ func (a App) deleteTab(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+	// TODO: Cleanup Audio Files
 	err = a.Db.DeleteTab(id)
 	if err != nil {
 		log.Println(err)

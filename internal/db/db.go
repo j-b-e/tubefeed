@@ -199,7 +199,7 @@ func (db *Database) CheckforDuplicate(video provider.VideoProvider, tabid int) (
 	return true, nil
 }
 
-func (db *Database) Delete(id uuid.UUID) error {
+func (db *Database) DeleteVideo(id uuid.UUID) error {
 	query := `DELETE FROM videos WHERE uuid = ?`
 	_, err := db.handler.Exec(query, id)
 	if err != nil {
@@ -261,8 +261,13 @@ func (db *Database) AddTab(name string) error {
 }
 
 func (db *Database) DeleteTab(id int) error {
-	query := `DELETE FROM tabs WHERE id = (?)`
+	query := `DELETE FROM videos WHERE tab = (?)`
 	_, err := db.handler.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	query = `DELETE FROM tabs WHERE id = (?)`
+	_, err = db.handler.Exec(query, id)
 	if err != nil {
 		return err
 	}
