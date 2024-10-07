@@ -39,10 +39,9 @@ type App struct {
 
 func Setup() App {
 	c := config.Load()
-	externalUrl := fmt.Sprintf("%s:%s", c.Hostname, c.ListenPort)
 	return App{
 		config:        c,
-		rss:           rss.NewRSS(externalUrl),
+		rss:           rss.NewRSS(c.ExternalURL),
 		videoProvider: config.SetupVideoProviders(),
 	}
 }
