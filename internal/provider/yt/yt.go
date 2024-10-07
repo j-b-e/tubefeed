@@ -72,22 +72,16 @@ func (y *yt) Url() string {
 }
 
 func (y *yt) Download(path string) error {
-	cacheUUID := uuid.NewString()
-	cachepath := fmt.Sprintf("./.cache/%s.mp3", cacheUUID)
-	log.Printf("⏳ Starting Download: %s", path)
 	_, err := os.Stat(path)
 	if err == nil {
 		return nil
 	}
-	cmd := exec.Command("yt-dlp", "--quiet", "--extract-audio", "--audio-format", "mp3", "-o", cachepath, y.Url())
+	log.Printf("⏳ Starting Download: %s", path)
+	cmd := exec.Command("yt-dlp", "--quiet", "--extract-audio", "--audio-format", "mp3", "-o", path, y.Url())
 	log.Printf("⏳ running cmd:  %s\n", cmd)
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("%w: failed cmd %s: %v", ErrYoutube, cmd, err)
-	}
-	err = os.Rename(cachepath, path)
-	if err != nil {
-		return fmt.Errorf("%w: failed rename: %v", ErrYoutube, err)
 	}
 	log.Printf("✅ finished Download: %s", path)
 	return nil

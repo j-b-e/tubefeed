@@ -207,7 +207,6 @@ func (a App) Run() (err error) {
 	r.PATCH("/tab/:id", a.patchtab)
 	r.GET("/tab/edit/:id", a.edittab)
 
-	// Start the web server
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
 }
 
