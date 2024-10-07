@@ -236,3 +236,35 @@ func (db *Database) ChangeTabName(id int, name string) error {
 	}
 	return nil
 }
+
+func (db *Database) AddTab(name string) error {
+	query := `SELECT id FROM tabs ORDER BY id DESC LIMIT 1;`
+	rows, err := db.handler.Query(query)
+	if err != nil {
+		return err
+	}
+
+	rows.Next()
+	var id int
+	err = rows.Scan(&id)
+	if err != nil {
+		return err
+	}
+	rows.Close()
+
+	query = `INSERT INTO tabs (id, name) VALUES (?, ?)`
+	_, err = db.handler.Exec(query, id+1, name)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) DeleteTab(id int) error {
+	query := `DELETE FROM tabs WHERE id = (?)`
+	_, err := db.handler.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}

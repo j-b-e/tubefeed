@@ -202,10 +202,15 @@ func (a App) Run() (err error) {
 		c.Data(http.StatusOK, "application/xml", []byte(rssfeed))
 	})
 
+	r.GET("/content/:id", a.handlecontent)
+
 	r.GET("/tab", a.tablist)
-	r.GET("/tab/:id", a.handletab)
+	r.GET("/tab/:id", a.tablist)
 	r.PATCH("/tab/:id", a.patchtab)
+	r.DELETE("/tab/:id", a.deleteTab)
 	r.GET("/tab/edit/:id", a.edittab)
+	r.POST("/tab", a.createtab)
+	r.POST("/tab/:id", a.createtab) // Id just sets the active tab not new tabid
 
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
 }
@@ -305,7 +310,7 @@ func fileExists(filePath string) bool {
 	return !errors.Is(err, fs.ErrNotExist)
 }
 
-func (a App) handletab(c *gin.Context) {
+func (a App) handlecontent(c *gin.Context) {
 	tabID := c.Param("id")
 	if tabID == "" || tabID == "1" {
 		videos, err := a.Db.LoadDatabase(1)
@@ -416,11 +421,17 @@ func (a App) patchtab(c *gin.Context) {
 	c.HTML(http.StatusOK, "tablist.html", gin.H{"Tabs": tabs, "tab": tabid})
 }
 
-// GET /tab
+// GET /tab and GET /tab/:id
 func (a App) tablist(c *gin.Context) {
-	active, err := strconv.Atoi(c.Query("active"))
+	ret := c.Param("id")
+	if ret == "" {
+		ret = "1"
+	}
+	active, err := strconv.Atoi(ret)
 	if err != nil {
-		active = 1
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
 	}
 	tabs, err := a.Db.LoadTabs()
 	if err != nil {
@@ -429,4 +440,31 @@ func (a App) tablist(c *gin.Context) {
 		return
 	}
 	c.HTML(http.StatusOK, "tablist.html", gin.H{"Tabs": tabs, "tab": active})
+}
+
+// POST /tab -- create a new tab
+func (a App) createtab(c *gin.Context) {
+	if err := a.Db.AddTab("New Tab"); err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	a.tablist(c)
+}
+
+// DELETE /tab/:id
+func (a App) deleteTab(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	err = a.Db.DeleteTab(id)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	a.tablist(c)
 }
