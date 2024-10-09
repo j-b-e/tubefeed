@@ -13,8 +13,6 @@ repos:
       - id: validate-toml
       - id: no-go-testing
       - id: go-generate
-        args:
-          - tubefeed/internal/sqlc
       - id: golangci-lint
       - id: go-unit-tests
       - id: go-build

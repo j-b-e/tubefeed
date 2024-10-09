@@ -1,5 +1,5 @@
 generate:
-	@go generate tubefeed/internal/sqlc
+	@go generate ./...
 
 build:
 	 @go build main.go

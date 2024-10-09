@@ -40,11 +40,12 @@ func NewDatabase(path string) (*Database, error) {
 	}, nil
 }
 
-func (db *Database) CreateTables() {
+func (db *Database) CreateTables() error {
 	_, err := db.handler.Exec(sqlc.Schema)
 	if err != nil {
-		log.Fatal(dbErr(err))
+		return dbErr(err)
 	}
+	return nil
 }
 
 // Fetches all video providers from the database
