@@ -19,4 +19,4 @@ Go to http://localhost:8091
 
 ## Development
 
-* Generate sqlc queries with``make generate`
+* Generate sqlc queries with `make generate`
