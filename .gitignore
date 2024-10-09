@@ -7,3 +7,7 @@ token
 .vscode/
 __debug_*
 main
+tubefeed
+internal/sqlc/db.go
+internal/sqlc/models.go
+internal/sqlc/query.sql.go

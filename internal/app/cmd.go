@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -55,7 +56,7 @@ func (a App) Run() (err error) {
 	}
 	defer a.Db.Close()
 
-	a.Db.CreateTable()
+	a.Db.CreateTables()
 
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/*")
@@ -63,13 +64,14 @@ func (a App) Run() (err error) {
 	r.Static("/static", "./static")
 
 	r.GET("/", func(c *gin.Context) {
-		tabs, err := a.Db.LoadTabs()
+		ctx := c.Request.Context()
+		tabs, err := a.Db.LoadTabs(ctx)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		videometa, err := a.loadVideoMeta(1)
+		videometa, err := a.loadVideoMeta(c.Request.Context(), 1)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -84,6 +86,7 @@ func (a App) Run() (err error) {
 
 	// Add a new video by fetching its metadata
 	r.POST("/audio", func(c *gin.Context) {
+		ctx := c.Request.Context()
 		videoURL := c.PostForm("youtube_url")
 		tabid, err := strconv.Atoi(c.PostForm("tab"))
 		if err != nil {
@@ -110,7 +113,7 @@ func (a App) Run() (err error) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		duplicate, err := a.Db.CheckforDuplicate(vid, tabid)
+		duplicate, err := a.Db.CheckforDuplicate(ctx, vid, tabid)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -128,10 +131,15 @@ func (a App) Run() (err error) {
 		}
 
 		// Save the metadata to the database
-		a.Db.SaveVideoMetadata(*videoMetadata)
+		err = a.Db.SaveVideoMetadata(ctx, *videoMetadata)
+		if err != nil {
+			log.Println(err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			return
+		}
 
 		// Reload the page with the updated video list
-		videometa, err := a.loadVideoMeta(tabid)
+		videometa, err := a.loadVideoMeta(ctx, tabid)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -147,6 +155,7 @@ func (a App) Run() (err error) {
 	r.GET("/audio/:id", a.streamAudio)
 	// Route to delete a video by ID
 	r.DELETE("/audio/:id", func(c *gin.Context) {
+		ctx := c.Request.Context()
 		id, err := uuid.Parse(c.Param("id"))
 		if err != nil {
 			log.Println(err)
@@ -155,7 +164,7 @@ func (a App) Run() (err error) {
 		}
 
 		// Delete the video from the database
-		err = a.deleteVideo(id)
+		err = a.deleteVideo(ctx, id)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -165,6 +174,7 @@ func (a App) Run() (err error) {
 	})
 
 	r.GET("/rss/:id", func(c *gin.Context) {
+		ctx := c.Request.Context()
 		// Fetch all videos from the database
 		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
@@ -172,13 +182,13 @@ func (a App) Run() (err error) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		videos, err := a.Db.LoadDatabase(id)
+		videos, err := a.Db.LoadDatabase(ctx, id)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		tabs, err := a.Db.LoadTabs()
+		tabs, err := a.Db.LoadTabs(ctx)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -216,6 +226,7 @@ func (a App) Run() (err error) {
 }
 
 func (a App) streamAudio(c *gin.Context) {
+	ctx := c.Request.Context()
 	audioID := c.Param("id")
 	audioUUID, err := uuid.Parse(audioID)
 	if err != nil {
@@ -266,7 +277,7 @@ func (a App) streamAudio(c *gin.Context) {
 	audioMutex.Lock()
 
 	if !fileExists(audioFilePath) {
-		video, err := a.Db.GetVideo(audioUUID)
+		video, err := a.Db.GetVideo(ctx, audioUUID)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -292,8 +303,8 @@ func (a App) streamAudio(c *gin.Context) {
 }
 
 // Deletes a video by ID from the database
-func (a App) deleteVideo(id uuid.UUID) error {
-	err := a.Db.DeleteVideo(id)
+func (a App) deleteVideo(ctx context.Context, id uuid.UUID) error {
+	err := a.Db.DeleteVideo(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -311,9 +322,10 @@ func fileExists(filePath string) bool {
 }
 
 func (a App) handlecontent(c *gin.Context) {
+	ctx := c.Request.Context()
 	tabID := c.Param("id")
 	if tabID == "" || tabID == "1" {
-		videos, err := a.Db.LoadDatabase(1)
+		videos, err := a.Db.LoadDatabase(ctx, 1)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -348,7 +360,7 @@ func (a App) handlecontent(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		videometa, err := a.loadVideoMeta(tabIDi)
+		videometa, err := a.loadVideoMeta(ctx, tabIDi)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -361,8 +373,8 @@ func (a App) handlecontent(c *gin.Context) {
 	}
 }
 
-func (a App) loadVideoMeta(tab int) ([]provider.VideoMetadata, error) {
-	videos, err := a.Db.LoadDatabase(tab)
+func (a App) loadVideoMeta(ctx context.Context, tab int) ([]provider.VideoMetadata, error) {
+	videos, err := a.Db.LoadDatabase(ctx, tab)
 	if err != nil {
 		return nil, err
 	}
@@ -380,13 +392,14 @@ func (a App) loadVideoMeta(tab int) ([]provider.VideoMetadata, error) {
 
 // GET /tab/:id
 func (a App) edittab(c *gin.Context) {
+	ctx := c.Request.Context()
 	tabid, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
-	tabs, err := a.Db.LoadTabs()
+	tabs, err := a.Db.LoadTabs(ctx)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -397,6 +410,7 @@ func (a App) edittab(c *gin.Context) {
 
 // PATCH /tab/:id
 func (a App) patchtab(c *gin.Context) {
+	ctx := c.Request.Context()
 	tabid, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		log.Println(err)
@@ -407,12 +421,12 @@ func (a App) patchtab(c *gin.Context) {
 	newname := c.PostForm("name")
 	log.Printf("newname: %s", newname)
 
-	err = a.Db.ChangeTabName(tabid, newname)
+	err = a.Db.ChangeTabName(ctx, tabid, newname)
 	if err != nil {
 		// ignore err, old name will be reused
 		log.Println(err)
 	}
-	tabs, err := a.Db.LoadTabs()
+	tabs, err := a.Db.LoadTabs(ctx)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -423,6 +437,7 @@ func (a App) patchtab(c *gin.Context) {
 
 // GET /tab and GET /tab/:id
 func (a App) tablist(c *gin.Context) {
+	ctx := c.Request.Context()
 	ret := c.Param("id")
 	if ret == "" {
 		ret = "1"
@@ -433,7 +448,7 @@ func (a App) tablist(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
-	tabs, err := a.Db.LoadTabs()
+	tabs, err := a.Db.LoadTabs(ctx)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -444,7 +459,8 @@ func (a App) tablist(c *gin.Context) {
 
 // POST /tab -- create a new tab
 func (a App) createtab(c *gin.Context) {
-	if err := a.Db.AddTab("New Tab"); err != nil {
+	ctx := c.Request.Context()
+	if err := a.Db.AddTab(ctx, "New Tab"); err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
@@ -454,6 +470,7 @@ func (a App) createtab(c *gin.Context) {
 
 // DELETE /tab/:id
 func (a App) deleteTab(c *gin.Context) {
+	ctx := c.Request.Context()
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		log.Println(err)
@@ -461,7 +478,7 @@ func (a App) deleteTab(c *gin.Context) {
 		return
 	}
 	// TODO: Cleanup Audio Files
-	err = a.Db.DeleteTab(id)
+	err = a.Db.DeleteTab(ctx, id)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)

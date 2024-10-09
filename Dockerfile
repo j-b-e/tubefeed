@@ -7,9 +7,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN apk --no-cache add gcc musl-dev sqlite-dev
+RUN apk --no-cache add gcc musl-dev sqlite-dev make
 ENV CGO_ENABLED=1
-RUN go build -o main .
+RUN make generate && go build -o main .
 
 
 FROM alpine:latest

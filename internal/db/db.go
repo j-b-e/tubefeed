@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"tubefeed/internal/config"
 	"tubefeed/internal/provider"
 	"tubefeed/internal/utils"
+
+	"tubefeed/internal/sqlc"
 
 	"github.com/google/uuid"
 )
@@ -22,79 +25,45 @@ func dbErr(s any) error {
 type Database struct {
 	handler  *sql.DB
 	provider *provider.Provider
+	queries  *sqlc.Queries
 }
 
 func NewDatabase(path string) (*Database, error) {
-	ret, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
 	}
 	return &Database{
-		handler:  ret,
+		handler:  db,
 		provider: config.SetupVideoProviders(),
+		queries:  sqlc.New(db),
 	}, nil
 }
 
-func (db *Database) CreateTable() {
-	log.Println("Creating Tables")
-	db.createTabTable()
-	db.createVideoTable()
-}
-
-func (db *Database) createVideoTable() {
-	query := `
-	CREATE TABLE IF NOT EXISTS videos (
-		uuid  	 	TEXT PRIMARY KEY,
-		title      	TEXT NOT NULL,
-		channel    	TEXT NOT NULL,
-		status    	TEXT NOT NULL,
-		length     	INTEGER NOT NULL,  -- length is in seconds
-		size		INTEGER,  -- size is in bytes
-		url        	TEXT NOT NULL,
-		tab			INTEGER,
-		FOREIGN KEY(tab) REFERENCES tabs(id)
-	);`
-	_, err := db.handler.Exec(query)
-	if err != nil {
-		log.Fatal(dbErr(err))
-	}
-}
-
-func (db *Database) createTabTable() {
-	query := `
-	CREATE TABLE IF NOT EXISTS tabs (
-		id  	 	INTEGER PRIMARY KEY,
-		name      	TEXT NOT NULL
-	);
-	INSERT OR IGNORE INTO tabs (id,  name) VALUES (1, "Tab 1");`
-	_, err := db.handler.Exec(query)
+func (db *Database) CreateTables() {
+	_, err := db.handler.Exec(sqlc.Schema)
 	if err != nil {
 		log.Fatal(dbErr(err))
 	}
 }
 
 // Fetches all video providers from the database
-func (db *Database) LoadDatabase(tab int) ([]provider.VideoProvider, error) {
-	query := `SELECT uuid, title, channel, status, length, url FROM videos WHERE tab=(?)`
-	rows, err := db.handler.Query(query, tab)
+func (db *Database) LoadDatabase(ctx context.Context, tab int) ([]provider.VideoProvider, error) {
+	rows, err := db.queries.LoadDatabase(ctx, sql.NullInt64{Int64: int64(tab), Valid: true})
 	if err != nil {
-		log.Println(dbErr(err))
 		return nil, err
 	}
-	defer rows.Close()
-
 	var videos []provider.VideoProvider
-	for rows.Next() {
-		var videomd provider.VideoMetadata
-		var id string
-		var len int
-		err := rows.Scan(&id, &videomd.Title, &videomd.Channel, &videomd.Status, &len, &videomd.URL)
-		if err != nil {
-			log.Println(err)
-			return nil, err
+	for _, row := range rows {
+		videomd := provider.VideoMetadata{
+			Length:  time.Duration(row.Length) * time.Second,
+			VideoID: uuid.MustParse(row.Uuid),
+			URL:     row.Url,
+			Channel: row.Channel,
+			Status:  row.Status,
+			Title:   row.Title,
 		}
-		videomd.Length = time.Duration(len) * time.Second
-		videomd.VideoID = uuid.MustParse(id)
+
 		domain, err := utils.ExtractDomain(videomd.URL)
 		if err != nil {
 			return nil, err
@@ -120,26 +89,22 @@ func (db *Database) LoadDatabase(tab int) ([]provider.VideoProvider, error) {
 	return videos, nil
 }
 
-func (db *Database) GetVideo(id uuid.UUID) (provider.VideoProvider, error) {
-	query := `SELECT title, channel, status, length, url FROM videos WHERE uuid = (?)`
-	rows, err := db.handler.Query(query, id.String())
+func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (provider.VideoProvider, error) {
+
+	row, err := db.queries.GetVideo(ctx, id.String())
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
+
 	videomd := provider.VideoMetadata{
 		VideoID: id,
+		Title:   row.Title,
+		Length:  time.Duration(row.Length) * time.Second,
+		Channel: row.Channel,
+		Status:  row.Status,
+		URL:     row.Url,
 	}
-	if !rows.Next() {
-		return nil, ErrDatabase
-	}
-	var len int
-	err = rows.Scan(&videomd.Title, &videomd.Channel, &videomd.Status, &len, &videomd.URL)
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	videomd.Length = time.Duration(len) * time.Second
+
 	domain, err := utils.ExtractDomain(videomd.URL)
 	if err != nil {
 		return nil, err
@@ -165,109 +130,108 @@ func (db *Database) GetVideo(id uuid.UUID) (provider.VideoProvider, error) {
 }
 
 // Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(video provider.VideoMetadata) {
-	len := video.Length.Seconds()
-	query := `INSERT INTO videos (uuid, title, channel, status, length, url, tab) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.handler.Exec(query, video.VideoID, video.Title, video.Channel, video.Status, len, video.URL, 1) // TODO: use real tabid
+func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoMetadata) error {
+	err := db.queries.SaveMetadata(
+		ctx,
+		sqlc.SaveMetadataParams{
+			Uuid:    video.VideoID.String(),
+			Title:   video.Title,
+			Channel: video.Channel,
+			Status:  video.Status,
+			Length:  int64(video.Length.Seconds()),
+			Url:     video.URL,
+			Tabid:   sql.NullInt64{Int64: 1, Valid: true}, // TODO: use correct id
+		})
 	if err != nil {
-		log.Fatal(dbErr(err))
+		return err
 	}
+	return nil
 }
 
 func (db *Database) Close() {
 	db.handler.Close()
 }
 
-func (db *Database) CheckforDuplicate(video provider.VideoProvider, tabid int) (bool, error) {
-	query := `SELECT count(*) FROM videos WHERE url = (?) and tab = (?)`
-	rows, err := db.handler.Query(query, video.Url(), tabid)
+func (db *Database) CheckforDuplicate(ctx context.Context, video provider.VideoProvider, tabid int) (bool, error) {
+
+	count, err := db.queries.CountDuplicate(
+		ctx,
+		sqlc.CountDuplicateParams{
+			Url:   video.Url(),
+			Tabid: sql.NullInt64{Int64: int64(tabid), Valid: true},
+		})
 	if err != nil {
-		log.Println(err)
 		return false, err
 	}
-	defer rows.Close()
 
-	var length int
-	rows.Next()
-	err = rows.Scan(&length)
-	if err != nil {
-		return true, err
-	}
-	if length == 0 {
+	if count == 0 {
 		return false, nil
 	}
 	return true, nil
 }
 
-func (db *Database) DeleteVideo(id uuid.UUID) error {
-	query := `DELETE FROM videos WHERE uuid = ?`
-	_, err := db.handler.Exec(query, id)
+func (db *Database) DeleteVideo(ctx context.Context, id uuid.UUID) error {
+	err := db.queries.DeleteVideo(ctx, id.String())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *Database) LoadTabs() (map[int]string, error) {
-	query := `SELECT * FROM tabs`
-	rows, err := db.handler.Query(query)
+func (db *Database) LoadTabs(ctx context.Context) (map[int]string, error) {
+	rows, err := db.queries.LoadTabs(ctx)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
-	defer rows.Close()
-	var id int
-	var name string
 	tabs := make(map[int]string)
-	for rows.Next() {
-		err = rows.Scan(&id, &name)
-		if err != nil {
-			return nil, err
-		}
-		tabs[id] = name
+	for _, row := range rows {
+		tabs[int(row.ID)] = row.Name
 	}
 	return tabs, nil
 }
-func (db *Database) ChangeTabName(id int, name string) error {
-	query := `UPDATE tabs SET name=(?) WHERE id=(?)`
-	_, err := db.handler.Exec(query, name, id)
+func (db *Database) ChangeTabName(ctx context.Context, id int, name string) error {
+	err := db.queries.ChangeTabName(
+		ctx,
+		sqlc.ChangeTabNameParams{
+			Name: name,
+			ID:   int64(id),
+		})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *Database) AddTab(name string) error {
-	query := `SELECT id FROM tabs ORDER BY id DESC LIMIT 1;`
-	rows, err := db.handler.Query(query)
+func (db *Database) AddTab(ctx context.Context, name string) error {
+
+	tabid, err := db.queries.GetLastTabId(ctx)
 	if err != nil {
 		return err
 	}
-
-	rows.Next()
-	var id int
-	err = rows.Scan(&id)
-	if err != nil {
-		return err
-	}
-	rows.Close()
-
-	query = `INSERT INTO tabs (id, name) VALUES (?, ?)`
-	_, err = db.handler.Exec(query, id+1, name)
+	err = db.queries.AddTab(
+		ctx,
+		sqlc.AddTabParams{
+			ID:   int64(tabid + 1),
+			Name: name,
+		},
+	)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *Database) DeleteTab(id int) error {
-	query := `DELETE FROM videos WHERE tab = (?)`
-	_, err := db.handler.Exec(query, id)
+func (db *Database) DeleteTab(ctx context.Context, id int) error {
+	err := db.queries.DeleteTab(ctx, int64(id))
 	if err != nil {
 		return err
 	}
-	query = `DELETE FROM tabs WHERE id = (?)`
-	_, err = db.handler.Exec(query, id)
+	err = db.queries.DeleteVideosFromTab(
+		ctx,
+		sql.NullInt64{
+			Int64: int64(id),
+			Valid: true,
+		})
 	if err != nil {
 		return err
 	}

@@ -16,3 +16,7 @@ Go to http://localhost:8091
 * Create audio-only Podcast Feeds from Youtube Videos
 * Organize your Podcasts in multiple playlist
 * Uses htmx for a smooth and modern experience
+
+## Development
+
+* Generate sqlc queries with``make generate`
