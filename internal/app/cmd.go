@@ -45,6 +45,7 @@ func (a App) Run() (err error) {
 	}
 
 	r := gin.Default()
+
 	r.LoadHTMLGlob("templates/*")
 
 	r.Static("/static", "./static")

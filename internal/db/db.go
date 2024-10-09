@@ -131,7 +131,7 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (provider.VideoP
 }
 
 // Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoMetadata) error {
+func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoMetadata, tabid int) error {
 	err := db.queries.SaveMetadata(
 		ctx,
 		sqlc.SaveMetadataParams{
@@ -141,7 +141,7 @@ func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoM
 			Status:  video.Status,
 			Length:  int64(video.Length.Seconds()),
 			Url:     video.URL,
-			Tabid:   sql.NullInt64{Int64: 1, Valid: true}, // TODO: use correct id
+			Tabid:   sql.NullInt64{Int64: int64(tabid), Valid: true},
 		})
 	if err != nil {
 		return err

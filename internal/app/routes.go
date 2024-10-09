@@ -94,7 +94,7 @@ func (a App) audioHandler(c *gin.Context) {
 	}
 
 	// Save the metadata to the database
-	err = a.Db.SaveVideoMetadata(ctx, *videoMetadata)
+	err = a.Db.SaveVideoMetadata(ctx, *videoMetadata, tabid)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
