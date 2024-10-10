@@ -30,7 +30,7 @@ type Database struct {
 func NewDatabase(path string) (db *Database, close func(), err error) {
 	sqlite, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, dbErr(err)
 	}
 	_, err = sqlite.Exec(sqlc.Schema)
 	if err != nil {
@@ -46,7 +46,7 @@ func NewDatabase(path string) (db *Database, close func(), err error) {
 func (db *Database) LoadDatabase(ctx context.Context, tab int) ([]provider.VideoProvider, error) {
 	rows, err := db.queries.LoadDatabase(ctx, sql.NullInt64{Int64: int64(tab), Valid: true})
 	if err != nil {
-		return nil, err
+		return nil, dbErr(err)
 	}
 	var videos []provider.VideoProvider
 	for _, row := range rows {
@@ -61,7 +61,7 @@ func (db *Database) LoadDatabase(ctx context.Context, tab int) ([]provider.Video
 
 		domain, err := utils.ExtractDomain(videomd.URL)
 		if err != nil {
-			return nil, err
+			return nil, dbErr(err)
 		}
 		if domain == "" {
 			log.Printf("Domain for '%s' is empty\n", videomd.VideoID)
@@ -88,7 +88,7 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (provider.VideoP
 
 	row, err := db.queries.GetVideo(ctx, id.String())
 	if err != nil {
-		return nil, err
+		return nil, dbErr(err)
 	}
 
 	videomd := provider.VideoMetadata{
@@ -102,23 +102,20 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (provider.VideoP
 
 	domain, err := utils.ExtractDomain(videomd.URL)
 	if err != nil {
-		return nil, err
+		return nil, dbErr(err)
 	}
 	provider, ok := db.provider.List[domain]
 	if !ok {
-		err = fmt.Errorf("%w: Provider for %s not found", ErrDatabase, domain)
-		log.Println(err)
-		return nil, err
+		msg := fmt.Sprintf("Provider for %s not found", domain)
+		return nil, dbErr(msg)
 	}
 	video, err := provider(videomd)
 	if err != nil {
-		log.Println(err)
-		return nil, err
+		return nil, dbErr(err)
 	}
 	_, err = video.LoadMetadata()
 	if err != nil {
-		log.Println(err)
-		return nil, err
+		return nil, dbErr(err)
 	}
 	return video, nil
 
@@ -138,7 +135,7 @@ func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoM
 			Tabid:   sql.NullInt64{Int64: int64(tabid), Valid: true},
 		})
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	return nil
 }
@@ -152,7 +149,7 @@ func (db *Database) CheckforDuplicate(ctx context.Context, video provider.VideoP
 			Tabid: sql.NullInt64{Int64: int64(tabid), Valid: true},
 		})
 	if err != nil {
-		return false, err
+		return false, dbErr(err)
 	}
 
 	if count == 0 {
@@ -164,7 +161,7 @@ func (db *Database) CheckforDuplicate(ctx context.Context, video provider.VideoP
 func (db *Database) DeleteVideo(ctx context.Context, id uuid.UUID) error {
 	err := db.queries.DeleteVideo(ctx, id.String())
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	return nil
 }
@@ -172,7 +169,7 @@ func (db *Database) DeleteVideo(ctx context.Context, id uuid.UUID) error {
 func (db *Database) LoadTabs(ctx context.Context) (map[int]string, error) {
 	rows, err := db.queries.LoadTabs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, dbErr(err)
 	}
 	tabs := make(map[int]string)
 	for _, row := range rows {
@@ -188,7 +185,7 @@ func (db *Database) ChangeTabName(ctx context.Context, id int, name string) erro
 			ID:   int64(id),
 		})
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	return nil
 }
@@ -197,7 +194,7 @@ func (db *Database) AddTab(ctx context.Context, name string) error {
 
 	tabid, err := db.queries.GetLastTabId(ctx)
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	err = db.queries.AddTab(
 		ctx,
@@ -207,7 +204,7 @@ func (db *Database) AddTab(ctx context.Context, name string) error {
 		},
 	)
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	return nil
 }
@@ -215,7 +212,7 @@ func (db *Database) AddTab(ctx context.Context, name string) error {
 func (db *Database) DeleteTab(ctx context.Context, id int) error {
 	err := db.queries.DeleteTab(ctx, int64(id))
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	err = db.queries.DeleteVideosFromTab(
 		ctx,
@@ -224,7 +221,7 @@ func (db *Database) DeleteTab(ctx context.Context, id int) error {
 			Valid: true,
 		})
 	if err != nil {
-		return err
+		return dbErr(err)
 	}
 	return nil
 }
