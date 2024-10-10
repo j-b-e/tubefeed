@@ -12,3 +12,7 @@ clean:
 
 mrproper: clean
 	rm -rf config/ audio/
+
+go-mod-update:
+	@go get -u ./...
+	@go mod tidy
