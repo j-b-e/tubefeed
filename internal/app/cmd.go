@@ -33,13 +33,13 @@ func Setup() App {
 // Run main app
 func (a App) Run() (err error) {
 
-	a.Db, err = db.NewDatabase(a.config.DbPath)
+	var closedb func()
+	a.Db, closedb, err = db.NewDatabase(a.config.DbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer a.Db.Close()
+	defer closedb()
 
-	err = a.Db.CreateTables()
 	if err != nil {
 		return err
 	}

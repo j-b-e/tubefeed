@@ -16,36 +16,30 @@ import (
 	"github.com/google/uuid"
 )
 
-var ErrDatabase = errors.New("database error")
+var ErrDatabase = errors.New("sqlite database error")
 
 func dbErr(s any) error {
 	return fmt.Errorf("%w: %v", ErrDatabase, s)
 }
 
 type Database struct {
-	handler  *sql.DB
 	provider *provider.Provider
 	queries  *sqlc.Queries
 }
 
-func NewDatabase(path string) (*Database, error) {
-	db, err := sql.Open("sqlite3", path)
+func NewDatabase(path string) (db *Database, close func(), err error) {
+	sqlite, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	_, err = sqlite.Exec(sqlc.Schema)
+	if err != nil {
+		return nil, nil, dbErr(err)
 	}
 	return &Database{
-		handler:  db,
 		provider: config.SetupVideoProviders(),
-		queries:  sqlc.New(db),
-	}, nil
-}
-
-func (db *Database) CreateTables() error {
-	_, err := db.handler.Exec(sqlc.Schema)
-	if err != nil {
-		return dbErr(err)
-	}
-	return nil
+		queries:  sqlc.New(sqlite),
+	}, func() { sqlite.Close() }, nil
 }
 
 // Fetches all video providers from the database
@@ -147,10 +141,6 @@ func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoM
 		return err
 	}
 	return nil
-}
-
-func (db *Database) Close() {
-	db.handler.Close()
 }
 
 func (db *Database) CheckforDuplicate(ctx context.Context, video provider.VideoProvider, tabid int) (bool, error) {
