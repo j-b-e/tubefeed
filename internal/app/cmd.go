@@ -5,7 +5,6 @@ import (
 	"log"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
-	"tubefeed/internal/provider"
 	"tubefeed/internal/rss"
 
 	"github.com/gin-gonic/gin"
@@ -14,19 +13,18 @@ import (
 )
 
 type App struct {
-	config        *config.Config
-	rss           *rss.RSS
-	ExternalURL   string
-	Db            *db.Database
-	videoProvider *provider.Provider
+	config      *config.Config
+	rss         *rss.RSS
+	ExternalURL string
+	Db          *db.Database
 }
 
 func Setup() App {
 	c := config.Load()
+
 	return App{
-		config:        c,
-		rss:           rss.NewRSS(c.ExternalURL),
-		videoProvider: config.SetupVideoProviders(),
+		config: c,
+		rss:    rss.NewRSS(c.ExternalURL),
 	}
 }
 

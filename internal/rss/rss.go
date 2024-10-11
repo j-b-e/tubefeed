@@ -4,9 +4,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"log"
 	"time"
-	"tubefeed/internal/provider"
+	"tubefeed/internal/meta"
 )
 
 var ErrRSS = errors.New("rss error")
@@ -63,7 +62,7 @@ func NewRSS(externalUrl string) *RSS {
 }
 
 // Generates a podcast RSS feed with the given metadata
-func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider, tabname string) (string, error) {
+func (r *RSS) GeneratePodcastFeed(videos []meta.Video, tabname string) (string, error) {
 	channel := PodcastChannel{
 		Title:       fmt.Sprintf("%s - Tubefeed", tabname),
 		Link:        r.ExternalUrl,
@@ -74,23 +73,18 @@ func (r *RSS) GeneratePodcastFeed(videos []provider.VideoProvider, tabname strin
 	}
 
 	for _, video := range videos {
-		metadata, err := video.LoadMetadata()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, metadata.VideoID) // Stub for audio files
+		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.Meta.ID) // Stub for audio files
 
 		item := PodcastItem{
-			Title:       fmt.Sprintf("%s - %s", metadata.Channel, metadata.Title),
+			Title:       fmt.Sprintf("%s - %s", video.Meta.Channel, video.Meta.Title),
 			Description: fmt.Sprintf("created with Tubefeed on playlist %s", tabname),
 			PubDate:     time.Now().Format("Tue, 15 Sep 2023 19:00:00 GMT"), //"Tue, 15 Sep 2023 19:00:00 GMT",
-			Link:        video.Url(),
-			GUID:        metadata.VideoID.String(),
+			Link:        video.Meta.URL,
+			GUID:        video.Meta.ID.String(),
 			Enclosure: PodcastEnclosure{
-				URL:    audioURL,                                     // Replace this with the actual audio file URL
-				Length: fmt.Sprintf("%f", metadata.Length.Seconds()), // size in bytes of the audio file
-				Type:   "audio/mpeg",                                 // The type of enclosure
+				URL:    audioURL,                                       // Replace this with the actual audio file URL
+				Length: fmt.Sprintf("%f", video.Meta.Length.Seconds()), // size in bytes of the audio file
+				Type:   "audio/mpeg",                                   // The type of enclosure
 			},
 		}
 		channel.Items = append(channel.Items, item)

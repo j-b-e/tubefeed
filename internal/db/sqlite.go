@@ -5,11 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"time"
-	"tubefeed/internal/config"
+	"tubefeed/internal/meta"
 	"tubefeed/internal/provider"
-	"tubefeed/internal/utils"
 
 	"tubefeed/internal/sqlc"
 
@@ -23,8 +21,7 @@ func dbErr(s any) error {
 }
 
 type Database struct {
-	provider *provider.Provider
-	queries  *sqlc.Queries
+	queries *sqlc.Queries
 }
 
 func NewDatabase(path string) (db *Database, close func(), err error) {
@@ -37,101 +34,68 @@ func NewDatabase(path string) (db *Database, close func(), err error) {
 		return nil, nil, dbErr(err)
 	}
 	return &Database{
-		provider: config.SetupVideoProviders(),
-		queries:  sqlc.New(sqlite),
+		queries: sqlc.New(sqlite),
 	}, func() { sqlite.Close() }, nil
 }
 
 // Fetches all video providers from the database
-func (db *Database) LoadDatabase(ctx context.Context, tab int) ([]provider.VideoProvider, error) {
+func (db *Database) LoadDatabase(ctx context.Context, tab int) ([]meta.Video, error) {
 	rows, err := db.queries.LoadDatabase(ctx, sql.NullInt64{Int64: int64(tab), Valid: true})
 	if err != nil {
 		return nil, dbErr(err)
 	}
-	var videos []provider.VideoProvider
+	var videos []meta.Video
 	for _, row := range rows {
-		videomd := provider.VideoMetadata{
-			Length:  time.Duration(row.Length) * time.Second,
-			VideoID: uuid.MustParse(row.Uuid),
-			URL:     row.Url,
-			Channel: row.Channel,
-			Status:  row.Status,
-			Title:   row.Title,
+		videomd := provider.VideoMeta{
+			Length:      time.Duration(row.Length) * time.Second,
+			ID:          uuid.MustParse(row.Uuid),
+			URL:         row.Url,
+			Channel:     row.Channel,
+			Title:       row.Title,
+			Description: "",
 		}
-
-		domain, err := utils.ExtractDomain(videomd.URL)
-		if err != nil {
-			return nil, dbErr(err)
+		video := meta.Video{
+			Meta: videomd,
 		}
-		if domain == "" {
-			log.Printf("Domain for '%s' is empty\n", videomd.VideoID)
-			continue
-		}
-		providerSetup, ok := db.provider.List[domain]
-		if !ok {
-			log.Printf("Provider for '%s' not found\n", domain)
-			continue
-		}
-		video, err := providerSetup(videomd)
-		if err != nil {
-			log.Println(fmt.Errorf("Provider %s returned %w", video.Url(), err))
-			continue
-		}
-		video.SetMetadata(&videomd)
 		videos = append(videos, video)
 	}
 
 	return videos, nil
 }
 
-func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (provider.VideoProvider, error) {
+func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Video, error) {
 
 	row, err := db.queries.GetVideo(ctx, id.String())
 	if err != nil {
-		return nil, dbErr(err)
+		return meta.Video{}, dbErr(err)
 	}
 
-	videomd := provider.VideoMetadata{
-		VideoID: id,
+	videomd := provider.VideoMeta{
+		ID:      id,
 		Title:   row.Title,
 		Length:  time.Duration(row.Length) * time.Second,
 		Channel: row.Channel,
-		Status:  row.Status,
 		URL:     row.Url,
 	}
 
-	domain, err := utils.ExtractDomain(videomd.URL)
-	if err != nil {
-		return nil, dbErr(err)
+	video := meta.Video{
+		Meta: videomd,
 	}
-	provider, ok := db.provider.List[domain]
-	if !ok {
-		msg := fmt.Sprintf("Provider for %s not found", domain)
-		return nil, dbErr(msg)
-	}
-	video, err := provider(videomd)
-	if err != nil {
-		return nil, dbErr(err)
-	}
-	_, err = video.LoadMetadata()
-	if err != nil {
-		return nil, dbErr(err)
-	}
+
 	return video, nil
 
 }
 
 // Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoMetadata, tabid int) error {
+func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Video, tabid int) error {
 	err := db.queries.SaveMetadata(
 		ctx,
 		sqlc.SaveMetadataParams{
-			Uuid:    video.VideoID.String(),
-			Title:   video.Title,
-			Channel: video.Channel,
-			Status:  video.Status,
-			Length:  int64(video.Length.Seconds()),
-			Url:     video.URL,
+			Uuid:    video.Meta.ID.String(),
+			Title:   video.Meta.Title,
+			Channel: video.Meta.Channel,
+			Length:  int64(video.Meta.Length.Seconds()),
+			Url:     video.Meta.URL,
 			Tabid:   sql.NullInt64{Int64: int64(tabid), Valid: true},
 		})
 	if err != nil {
@@ -140,12 +104,12 @@ func (db *Database) SaveVideoMetadata(ctx context.Context, video provider.VideoM
 	return nil
 }
 
-func (db *Database) CheckforDuplicate(ctx context.Context, video provider.VideoProvider, tabid int) (bool, error) {
+func (db *Database) CheckforDuplicate(ctx context.Context, video meta.Video, tabid int) (bool, error) {
 
 	count, err := db.queries.CountDuplicate(
 		ctx,
 		sqlc.CountDuplicateParams{
-			Url:   video.Url(),
+			Url:   video.Meta.URL,
 			Tabid: sql.NullInt64{Int64: int64(tabid), Valid: true},
 		})
 	if err != nil {

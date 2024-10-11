@@ -1,6 +1,8 @@
 package utils
 
-import "net/url"
+import (
+	"net/url"
+)
 
 func ExtractDomain(rawurl string) (string, error) {
 	parsedUrl, err := url.Parse(rawurl)

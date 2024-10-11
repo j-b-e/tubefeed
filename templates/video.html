@@ -1,22 +1,22 @@
-<tr id="audio-{{ .VideoID }}">
+<tr id="audio-{{ .Meta.ID }}">
     <td><audio controls>
-        <source src="/audio/{{ .VideoID }}" type="audio/mpeg">
+        <source src="/audio/{{ .Meta.ID }}" type="audio/mpeg">
         Your browser does not support the audio element.
       </audio>
     </td>
     <td class="name-column">
-        {{ .Channel }} - {{ .Title }}
+        {{ .Meta.Channel }} - {{ .Meta.Title }}
     </td>
     <td>
         <div class="info-icon">
             ℹ️
             <div class="info-window">
-                {{ .VideoID }}
+                {{ .Meta.ID }}
             </div>
         </div>
         <div class="info-icon">
-            <a href="{{ .URL }}" target="_blank">▶️</a>
-            <div class="info-window">{{ .URL }}</div>
+            <a href="{{ .Meta.URL }}" target="_blank">▶️</a>
+            <div class="info-window">{{ .Meta.URL }}</div>
         </div>
         </div>
     </td>
@@ -24,6 +24,6 @@
         {{ .Status }}
     </td>
     <td>
-        <button class="delete-button" hx-delete="/audio/{{ .VideoID }}" hx-target="#audio-{{ .VideoID }}" hx-swap="outerHTML swap:1s">Delete</button>
+        <button class="delete-button" hx-delete="/audio/{{ .Meta.ID }}" hx-target="#audio-{{ .Meta.ID }}" hx-swap="outerHTML swap:1s">Delete</button>
     </td>
 </tr>

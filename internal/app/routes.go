@@ -11,8 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
-	"tubefeed/internal/provider"
-	"tubefeed/internal/utils"
+	"tubefeed/internal/meta"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -47,30 +46,24 @@ func (a App) rootHandler(c *gin.Context) {
 	})
 }
 
-// GET /audio
+// POST /audio
 func (a App) audioHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	videoURL := c.PostForm("youtube_url")
+	if videoURL == "" {
+		err := fmt.Errorf("No url provided.")
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
 	tabid, err := strconv.Atoi(c.PostForm("tab"))
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
-	domain, err := utils.ExtractDomain(videoURL)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
-	providerSetup, ok := a.videoProvider.List[domain]
-	if !ok {
-		resp := fmt.Sprintf("No provider for %s found", domain)
-		log.Println(resp)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, resp)
-		return
-	}
-	vid, err := providerSetup(provider.VideoMetadata{VideoID: uuid.New(), URL: videoURL})
+
+	vid, err := meta.NewVideo(videoURL)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -86,15 +79,9 @@ func (a App) audioHandler(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"conflict": "Audio already present"})
 		return
 	}
-	videoMetadata, err := vid.LoadMetadata()
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
 
 	// Save the metadata to the database
-	err = a.Db.SaveVideoMetadata(ctx, *videoMetadata, tabid)
+	err = a.Db.SaveVideoMetadata(ctx, vid, tabid)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -138,22 +125,13 @@ func (a App) handlecontent(c *gin.Context) {
 	ctx := c.Request.Context()
 	tabID := c.Param("id")
 	if tabID == "" || tabID == "1" {
-		videos, err := a.Db.LoadDatabase(ctx, 1)
+		videometa, err := a.Db.LoadDatabase(ctx, 1)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		var videometa []provider.VideoMetadata
-		for _, video := range videos {
-			meta, err := video.LoadMetadata()
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			videometa = append(videometa, *meta)
 
-		}
 		if tabID == "" {
 			c.HTML(http.StatusOK, "index.html", gin.H{
 				"Videos": videometa,
@@ -186,21 +164,12 @@ func (a App) handlecontent(c *gin.Context) {
 	}
 }
 
-func (a App) loadVideoMeta(ctx context.Context, tab int) ([]provider.VideoMetadata, error) {
+func (a App) loadVideoMeta(ctx context.Context, tab int) ([]meta.Video, error) {
 	videos, err := a.Db.LoadDatabase(ctx, tab)
 	if err != nil {
 		return nil, err
 	}
-	var videometa []provider.VideoMetadata
-	for _, v := range videos {
-		meta, err := v.LoadMetadata()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		videometa = append(videometa, *meta)
-	}
-	return videometa, nil
+	return videos, nil
 }
 
 func (a App) streamAudio(c *gin.Context) {
@@ -261,13 +230,6 @@ func (a App) streamAudio(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		_, err = video.LoadMetadata()
-		if err != nil {
-			log.Println(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-			return
-		}
-
 		go func() {
 			defer audioMutex.Unlock()
 			err := video.Download(audioFilePath)
