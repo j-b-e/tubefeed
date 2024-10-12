@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 )
 
 func ExtractDomain(rawurl string) (string, error) {
@@ -9,5 +11,9 @@ func ExtractDomain(rawurl string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return parsedUrl.Host, nil
+	host := strings.Split(parsedUrl.Host, ".")
+	if len(host) < 2 {
+		return "", fmt.Errorf("%s ist not a fqdn", parsedUrl.Host)
+	}
+	return strings.Join(host[len(host)-2:], "."), nil
 }

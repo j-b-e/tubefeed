@@ -7,8 +7,7 @@ import (
 )
 
 var registry = map[string]provider.ProviderNewVideoFn{
-	"youtube.com":     yt.New,
-	"www.youtube.com": yt.New,
+	"youtube.com": yt.New,
 }
 
 func Register(name string, fn provider.ProviderNewVideoFn) {
