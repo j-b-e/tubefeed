@@ -5,6 +5,7 @@ import (
 	"log"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
+	"tubefeed/internal/meta/worker"
 	"tubefeed/internal/rss"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,7 @@ type App struct {
 	rss         *rss.RSS
 	ExternalURL string
 	Db          *db.Database
+	worker      worker.Worker
 }
 
 func Setup() App {
@@ -38,9 +40,9 @@ func (a App) Run() (err error) {
 	}
 	defer closedb()
 
-	if err != nil {
-		return err
-	}
+	var closeworker func()
+	a.worker, closeworker = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath)
+	defer closeworker()
 
 	r := gin.Default()
 
@@ -52,6 +54,8 @@ func (a App) Run() (err error) {
 
 	// Add a new video by fetching its metadata
 	r.POST("/audio", a.audioHandler)
+	// status audio route
+	r.GET("/audio/status/:id", a.statusAudio)
 	// Stream or download audio route
 	r.GET("/audio/:id", a.streamAudio)
 

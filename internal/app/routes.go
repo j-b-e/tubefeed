@@ -53,13 +53,13 @@ func (a App) audioHandler(c *gin.Context) {
 	if videoURL == "" {
 		err := fmt.Errorf("No url provided.")
 		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return
 	}
 	tabid, err := strconv.Atoi(c.PostForm("tab"))
 	if err != nil {
 		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return
 	}
 
@@ -69,6 +69,7 @@ func (a App) audioHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+
 	duplicate, err := a.Db.CheckforDuplicate(ctx, vid, tabid)
 	if err != nil {
 		log.Println(err)
@@ -80,8 +81,18 @@ func (a App) audioHandler(c *gin.Context) {
 		return
 	}
 
-	// Save the metadata to the database
-	err = a.Db.SaveVideoMetadata(ctx, vid, tabid)
+	err = a.Db.SaveVideoMetadata(ctx, vid, tabid, meta.StatusNew)
+	if err != nil {
+		log.Printf("dberror: %v", err)
+		err = a.Db.SetStatus(ctx, vid.ID, meta.StatusError)
+		if err != nil {
+			// errception
+			log.Printf("dberror: %v", err)
+		}
+		return
+	}
+	// send download to worker
+	err = a.worker.Download(vid, tabid)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -95,7 +106,6 @@ func (a App) audioHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
-
 	c.HTML(http.StatusOK, "video_list.html", gin.H{
 		"Videos": videometa,
 	})
@@ -119,6 +129,24 @@ func (a App) audioIDhandler(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusOK)
+}
+
+// GET /audio/status/:id
+func (a App) statusAudio(c *gin.Context) {
+	ctx := c.Request.Context()
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, fmt.Sprintf("{\"err\": \"%v\"}", err))
+		return
+	}
+	video, err := a.Db.GetVideo(ctx, id)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, err)
+		return
+	}
+	c.HTML(http.StatusOK, "video.html", video)
 }
 
 func (a App) handlecontent(c *gin.Context) {

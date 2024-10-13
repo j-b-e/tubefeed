@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 	"tubefeed/internal/provider"
+
+	"github.com/google/uuid"
 )
 
 type yt struct {
@@ -40,19 +42,28 @@ func (y *yt) Url() string {
 	return url(y.ytid)
 }
 
-func (y *yt) Download(path string) error {
+func (y *yt) Download(id uuid.UUID, path string) error {
 	_, err := os.Stat(path)
-	if err == nil {
-		return nil
-	}
-	log.Printf("⏳ Starting Download: %s", path)
-	cmd := exec.Command("yt-dlp", "--quiet", "--extract-audio", "--audio-format", "mp3", "-o", path, y.Url())
-	log.Printf("⏳ running cmd:  %s\n", cmd)
-	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("%w: failed cmd %s: %v", ErrYoutube, cmd, err)
+		return err
 	}
-	log.Printf("✅ finished Download: %s", path)
+	log.Printf("⏳ yt: Starting Download: %s", path)
+	cmd := exec.Command(
+		"yt-dlp",
+		"--quiet",
+		"--extract-audio",
+		"--audio-format", "mp3",
+		"-P", path,
+		"-P", "temp:.cache",
+		"-o", id.String(),
+		y.Url(),
+	)
+	log.Printf("⏳ yt: running cmd:  %s\n", cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, out)
+	}
+	log.Printf("✅ yt: finished Download: %s - %s", id, y.Url())
 	return nil
 }
 
@@ -64,7 +75,7 @@ func (y *yt) LoadMetadata() (*provider.VideoMeta, error) {
 	log.Printf("⏳ running cmd:  %s\n", cmd)
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed cmd %s: %v", ErrYoutube, cmd, err)
+		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, out)
 	}
 	var result map[string]any
 	err = json.Unmarshal([]byte(out), &result)

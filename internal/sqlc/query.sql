@@ -1,5 +1,5 @@
 -- name: SaveMetadata :exec
-INSERT INTO videos (
+INSERT OR REPLACE INTO videos (
   uuid, title, channel, status, length, url, tabid
 ) VALUES (
   ?, ?, ?, ?, ?, ?, ?
@@ -28,6 +28,17 @@ WHERE tabid = ?;
 SELECT count(*)
 FROM videos
 WHERE url = ? AND tabid = ?;
+
+
+-- name: SetStatus :exec
+UPDATE videos
+SET status = ?
+WHERE uuid = ?;
+
+-- name: GetStatus :exec
+SELECT status
+FROM videos
+WHERE uuid = ?;
 
 -- name: LoadTabs :many
 SELECT *

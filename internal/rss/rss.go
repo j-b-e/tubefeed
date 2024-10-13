@@ -73,14 +73,17 @@ func (r *RSS) GeneratePodcastFeed(videos []meta.Video, tabname string) (string, 
 	}
 
 	for _, video := range videos {
-		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.Meta.ID) // Stub for audio files
+		if video.Status != meta.StatusReady {
+			continue
+		}
+		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.ID) // Stub for audio files
 
 		item := PodcastItem{
 			Title:       fmt.Sprintf("%s - %s", video.Meta.Channel, video.Meta.Title),
 			Description: fmt.Sprintf("created with Tubefeed on playlist %s", tabname),
 			PubDate:     time.Now().Format("Tue, 15 Sep 2023 19:00:00 GMT"), //"Tue, 15 Sep 2023 19:00:00 GMT",
 			Link:        video.Meta.URL,
-			GUID:        video.Meta.ID.String(),
+			GUID:        video.ID.String(),
 			Enclosure: PodcastEnclosure{
 				URL:    audioURL,                                       // Replace this with the actual audio file URL
 				Length: fmt.Sprintf("%f", video.Meta.Length.Seconds()), // size in bytes of the audio file

@@ -5,6 +5,7 @@
   length          INTEGER NOT NULL,  -- length is in seconds
   size            INTEGER,  -- size is in bytes
   url             TEXT NOT NULL,
+  status          TEXT NOT NULL,
   provider_id     TEXT,
   tabid           INTEGER,
   FOREIGN KEY(tabid) REFERENCES tabs(id)

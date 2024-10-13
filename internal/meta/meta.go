@@ -11,8 +11,9 @@ import (
 
 type Video struct {
 	provider provider.VideoProvider
-	Status   string
+	Status   Status
 	Meta     provider.VideoMeta
+	ID       uuid.UUID
 }
 
 type VideoProviderList map[string]provider.ProviderNewVideoFn
@@ -20,6 +21,16 @@ type VideoProviderList map[string]provider.ProviderNewVideoFn
 type Provider struct {
 	List VideoProviderList
 }
+
+type Status string
+
+var (
+	StatusNew     Status = "New"
+	StatusMeta    Status = "FetchingMeta"
+	StatusLoading Status = "Downloading"
+	StatusReady   Status = "Available"
+	StatusError   Status = "Error"
+)
 
 func (vm *Video) Download(path string) error {
 	if vm.provider == nil {
@@ -37,32 +48,36 @@ func (vm *Video) Download(path string) error {
 		}
 		vm.provider = provider
 	}
-	return vm.provider.Download(path)
+	return vm.provider.Download(vm.ID, path)
 }
 
 func NewVideo(url string) (Video, error) {
 	domain, _ := utils.ExtractDomain(url)
 	new := registry.Get(domain)
-	provider, err := new(url)
+	prov, err := new(url)
 	if err != nil {
 		return Video{}, err
 	}
-	meta, err := provider.LoadMetadata()
-	meta.ID = uuid.New()
-	if err != nil {
-		return Video{}, err
+
+	meta := provider.VideoMeta{
+		URL:   prov.Url(),
+		Title: "Loading...",
 	}
 	return Video{
-		Meta:     *meta,
-		provider: provider,
+		ID:       uuid.New(),
+		Meta:     meta,
+		provider: prov,
+		Status:   StatusNew,
 	}, nil
 }
 
 func (vm *Video) LoadMeta() error {
+
 	videomd, err := vm.provider.LoadMetadata()
 	if err != nil {
 		return err
 	}
 	vm.Meta = *videomd
+
 	return nil
 }

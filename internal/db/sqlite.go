@@ -48,14 +48,15 @@ func (db *Database) LoadDatabase(ctx context.Context, tab int) ([]meta.Video, er
 	for _, row := range rows {
 		videomd := provider.VideoMeta{
 			Length:      time.Duration(row.Length) * time.Second,
-			ID:          uuid.MustParse(row.Uuid),
 			URL:         row.Url,
 			Channel:     row.Channel,
 			Title:       row.Title,
 			Description: "",
 		}
 		video := meta.Video{
-			Meta: videomd,
+			ID:     uuid.MustParse(row.Uuid),
+			Meta:   videomd,
+			Status: meta.Status(row.Status),
 		}
 		videos = append(videos, video)
 	}
@@ -71,7 +72,7 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Video, err
 	}
 
 	videomd := provider.VideoMeta{
-		ID:      id,
+
 		Title:   row.Title,
 		Length:  time.Duration(row.Length) * time.Second,
 		Channel: row.Channel,
@@ -79,24 +80,26 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Video, err
 	}
 
 	video := meta.Video{
-		Meta: videomd,
+		ID:     id,
+		Meta:   videomd,
+		Status: meta.Status(row.Status),
 	}
 
 	return video, nil
-
 }
 
 // Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Video, tabid int) error {
+func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Video, tabid int, status meta.Status) error {
 	err := db.queries.SaveMetadata(
 		ctx,
 		sqlc.SaveMetadataParams{
-			Uuid:    video.Meta.ID.String(),
+			Uuid:    video.ID.String(),
 			Title:   video.Meta.Title,
 			Channel: video.Meta.Channel,
 			Length:  int64(video.Meta.Length.Seconds()),
 			Url:     video.Meta.URL,
 			Tabid:   sql.NullInt64{Int64: int64(tabid), Valid: true},
+			Status:  string(status),
 		})
 	if err != nil {
 		return dbErr(err)
@@ -184,6 +187,20 @@ func (db *Database) DeleteTab(ctx context.Context, id int) error {
 			Int64: int64(id),
 			Valid: true,
 		})
+	if err != nil {
+		return dbErr(err)
+	}
+	return nil
+}
+
+func (db *Database) SetStatus(ctx context.Context, id uuid.UUID, status meta.Status) error {
+	err := db.queries.SetStatus(
+		ctx,
+		sqlc.SetStatusParams{
+			Status: string(status),
+			Uuid:   id.String(),
+		},
+	)
 	if err != nil {
 		return dbErr(err)
 	}

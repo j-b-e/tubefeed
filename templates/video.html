@@ -1,8 +1,16 @@
-<tr id="audio-{{ .Meta.ID }}">
-    <td><audio controls>
-        <source src="/audio/{{ .Meta.ID }}" type="audio/mpeg">
+{{ $pending := "true" }}
+{{ if or (eq .Status "Available") (eq .Status "Error") }}
+{{ $pending = "false" }}
+{{ end }}
+
+<tr id="audio-{{ .ID }}" {{ if eq $pending "true" }}hx-get="/audio/status/{{ .ID }}" hx-trigger="every 6s" hx-swap="outerHTML"{{ end }}>
+    <td>
+    {{ if eq $pending "false" }}
+        <audio controls>
+        <source src="/audio/{{ .ID }}" type="audio/mpeg">
         Your browser does not support the audio element.
       </audio>
+    {{ end }}
     </td>
     <td class="name-column">
         {{ .Meta.Channel }} - {{ .Meta.Title }}
@@ -11,19 +19,18 @@
         <div class="info-icon">
             ℹ️
             <div class="info-window">
-                {{ .Meta.ID }}
+                {{ .ID }}
             </div>
         </div>
         <div class="info-icon">
             <a href="{{ .Meta.URL }}" target="_blank">▶️</a>
             <div class="info-window">{{ .Meta.URL }}</div>
         </div>
-        </div>
     </td>
     <td>
         {{ .Status }}
     </td>
     <td>
-        <button class="delete-button" hx-delete="/audio/{{ .Meta.ID }}" hx-target="#audio-{{ .Meta.ID }}" hx-swap="outerHTML swap:1s">Delete</button>
+        <button class="delete-button" hx-delete="/audio/{{ .ID }}" hx-target="#audio-{{ .ID }}" hx-swap="outerHTML swap:1s">Delete</button>
     </td>
 </tr>
