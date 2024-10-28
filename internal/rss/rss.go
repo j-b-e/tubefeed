@@ -10,6 +10,8 @@ import (
 
 var ErrRSS = errors.New("rss error")
 
+const rfc2822 = "Mon Jan 02 2006 15:04:05 MST"
+
 // PodcastRSS defines the structure for the podcast RSS XML feed
 type PodcastRSS struct {
 	XMLName     xml.Name       `xml:"rss"`
@@ -76,18 +78,19 @@ func (r *RSS) GeneratePodcastFeed(videos []meta.Video, tabname string) (string, 
 		if video.Status != meta.StatusReady {
 			continue
 		}
-		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.ID) // Stub for audio files
+		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.ID)
 
+		// https://help.apple.com/itc/podcasts_connect/#/itcb54353390
 		item := PodcastItem{
 			Title:       fmt.Sprintf("%s - %s", video.Meta.Channel, video.Meta.Title),
 			Description: fmt.Sprintf("created with Tubefeed on playlist %s", tabname),
-			PubDate:     time.Now().Format("Tue, 15 Sep 2023 19:00:00 GMT"), //"Tue, 15 Sep 2023 19:00:00 GMT",
+			PubDate:     time.Now().Format(rfc2822),
 			Link:        video.Meta.URL,
 			GUID:        video.ID.String(),
 			Enclosure: PodcastEnclosure{
-				URL:    audioURL,                                       // Replace this with the actual audio file URL
-				Length: fmt.Sprintf("%f", video.Meta.Length.Seconds()), // size in bytes of the audio file
-				Type:   "audio/mpeg",                                   // The type of enclosure
+				URL:    audioURL,
+				Length: fmt.Sprintf("%d", 0), // TODO: size in bytes of the audio file
+				Type:   "audio/mpeg",
 			},
 		}
 		channel.Items = append(channel.Items, item)
