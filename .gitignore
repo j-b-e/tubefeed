@@ -5,6 +5,7 @@ yt2pod
 yt.json
 token
 .vscode/
+dist/
 __debug_*
 main
 tubefeed

@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
 	"tubefeed/internal/meta/worker"
@@ -19,14 +20,16 @@ type App struct {
 	ExternalURL string
 	Db          *db.Database
 	worker      worker.Worker
+	version     string
 }
 
-func Setup() App {
+func Setup(version string) App {
 	c := config.Load()
 
 	return App{
-		config: c,
-		rss:    rss.NewRSS(c.ExternalURL),
+		config:  c,
+		rss:     rss.NewRSS(c.ExternalURL),
+		version: version,
 	}
 }
 
@@ -73,6 +76,11 @@ func (a App) Run() (err error) {
 	r.GET("/tab/edit/:id", a.edittab)
 	r.POST("/tab", a.createtab)
 	r.POST("/tab/:id", a.createtab) // Id just sets the active tab not new tabid
+
+	r.GET("/version", func(c *gin.Context) {
+		json := []byte(`{"version": "` + a.version + `" }`)
+		c.Data(http.StatusOK, gin.MIMEJSON, json)
+	})
 
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
 }
