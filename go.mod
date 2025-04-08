@@ -7,7 +7,7 @@ toolchain go1.22.7
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
-	github.com/mattn/go-sqlite3 v1.14.24
+	github.com/mattn/go-sqlite3 v1.14.27
 	github.com/sqlc-dev/sqlc v1.27.0
 )
 
