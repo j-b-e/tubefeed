@@ -51,7 +51,7 @@ func (a App) audioHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	videoURL := c.PostForm("youtube_url")
 	if videoURL == "" {
-		err := fmt.Errorf("No url provided.")
+		err := fmt.Errorf("no url provided")
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return

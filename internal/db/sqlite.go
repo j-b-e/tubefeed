@@ -35,7 +35,7 @@ func NewDatabase(path string) (db *Database, close func(), err error) {
 	}
 	return &Database{
 		queries: sqlc.New(sqlite),
-	}, func() { sqlite.Close() }, nil
+	}, func() { _ = sqlite.Close() }, nil
 }
 
 // Fetches all video providers from the database
