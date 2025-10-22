@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
-	"tubefeed/internal/meta/worker"
+	"tubefeed/internal/models"
 	"tubefeed/internal/rss"
+	"tubefeed/internal/worker"
 
 	"github.com/gin-gonic/gin"
 
@@ -43,9 +44,9 @@ func (a App) Run() (err error) {
 	}
 	defer closedb()
 
-	var closeworker func()
-	a.worker, closeworker = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath)
-	defer closeworker()
+	req := make(chan models.Request, 20)
+	defer close(req)
+	a.worker = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath, req)
 
 	r := gin.Default()
 
@@ -69,18 +70,13 @@ func (a App) Run() (err error) {
 
 	r.GET("/content/:id", a.handlecontent)
 
-	r.GET("/tab", a.tablist)
-	r.GET("/tab/:id", a.tablist)
-	r.PATCH("/tab/:id", a.patchtab)
-	r.DELETE("/tab/:id", a.deleteTab)
-	r.GET("/tab/edit/:id", a.edittab)
-	r.POST("/tab", a.createtab)
-	r.POST("/tab/:id", a.createtab) // Id just sets the active tab not new tabid
-
 	r.GET("/version", func(c *gin.Context) {
 		json := []byte(`{"version": "` + a.version + `" }`)
 		c.Data(http.StatusOK, gin.MIMEJSON, json)
 	})
+
+	// SSE Endpoint
+	r.GET("/events", a.eventsHandler)
 
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
 }

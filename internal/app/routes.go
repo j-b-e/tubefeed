@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"sync"
 	"tubefeed/internal/meta"
+	"tubefeed/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -27,22 +28,15 @@ var (
 // GET /
 func (a App) rootHandler(c *gin.Context) {
 	ctx := c.Request.Context()
-	tabs, err := a.Db.LoadTabs(ctx)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
-	videometa, err := a.loadVideoMeta(c.Request.Context(), 1)
+	videometa, err := a.loadVideoMeta(ctx)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
-		"tab":    1,
-		"Tabs":   tabs,
-		"Videos": videometa,
+		"playlist": nil,
+		"audio":    videometa,
 	})
 }
 
@@ -56,12 +50,6 @@ func (a App) audioHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return
 	}
-	tabid, err := strconv.Atoi(c.PostForm("tab"))
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, err)
-		return
-	}
 
 	vid, err := meta.NewVideo(videoURL)
 	if err != nil {
@@ -70,7 +58,7 @@ func (a App) audioHandler(c *gin.Context) {
 		return
 	}
 
-	duplicate, err := a.Db.CheckforDuplicate(ctx, vid, tabid)
+	duplicate, err := a.Db.CheckforDuplicate(ctx, vid, uuid.MustParse(models.Default_playlist))
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -81,7 +69,7 @@ func (a App) audioHandler(c *gin.Context) {
 		return
 	}
 
-	err = a.Db.SaveVideoMetadata(ctx, vid, tabid, meta.StatusNew)
+	err = a.Db.SaveVideoMetadata(ctx, vid, uuid.MustParse(models.Default_playlist), meta.StatusNew)
 	if err != nil {
 		log.Printf("dberror: %v", err)
 		err = a.Db.SetStatus(ctx, vid.ID, meta.StatusError)
@@ -92,7 +80,7 @@ func (a App) audioHandler(c *gin.Context) {
 		return
 	}
 	// send download to worker
-	err = a.worker.Download(vid, tabid)
+	err = a.worker.Download(vid)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -100,7 +88,7 @@ func (a App) audioHandler(c *gin.Context) {
 	}
 
 	// Reload the page with the updated video list
-	videometa, err := a.loadVideoMeta(ctx, tabid)
+	videometa, err := a.loadVideoMeta(ctx)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -153,7 +141,7 @@ func (a App) handlecontent(c *gin.Context) {
 	ctx := c.Request.Context()
 	tabID := c.Param("id")
 	if tabID == "" || tabID == "1" {
-		videometa, err := a.Db.LoadDatabase(ctx, 1)
+		videometa, err := a.Db.LoadDatabase(ctx)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -179,7 +167,7 @@ func (a App) handlecontent(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
-		videometa, err := a.loadVideoMeta(ctx, tabIDi)
+		videometa, err := a.loadVideoMeta(ctx)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -192,8 +180,8 @@ func (a App) handlecontent(c *gin.Context) {
 	}
 }
 
-func (a App) loadVideoMeta(ctx context.Context, tab int) ([]meta.Video, error) {
-	videos, err := a.Db.LoadDatabase(ctx, tab)
+func (a App) loadVideoMeta(ctx context.Context) ([]meta.Source, error) {
+	videos, err := a.Db.LoadDatabase(ctx)
 	if err != nil {
 		return nil, err
 	}

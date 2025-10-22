@@ -12,3 +12,5 @@ tubefeed
 internal/sqlc/db.go
 internal/sqlc/models.go
 internal/sqlc/query.sql.go
+audio/
+config/

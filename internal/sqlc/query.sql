@@ -1,67 +1,44 @@
 -- name: SaveMetadata :exec
-INSERT OR REPLACE INTO videos (
-  uuid, title, channel, status, length, url, tabid
+INSERT OR REPLACE INTO audio (
+  uuid, title, channel, status, length, url, playlist_id
 ) VALUES (
   ?, ?, ?, ?, ?, ?, ?
 );
 
 -- name: LoadDatabase :many
 SELECT uuid, title, channel, status, length, url
-FROM videos
-WHERE tabid = ?;
+FROM audio;
+
+-- name: LoadPlaylist :many
+SELECT uuid, title, channel, status, length, url
+FROM audio
+WHERE playlist_id = ?;
 
 -- name: GetVideo :one
 SELECT title, channel, status, length, url
-FROM videos
+FROM audio
 WHERE uuid = ?
 LIMIT 1;
 
 -- name: DeleteVideo :exec
-DELETE FROM videos
+DELETE FROM audio
 WHERE uuid = ?;
 
 -- name: DeleteVideosFromTab :exec
-DELETE FROM videos
-WHERE tabid = ?;
+DELETE FROM audio
+WHERE playlist_id = ?;
 
 -- name: CountDuplicate :one
 SELECT count(*)
-FROM videos
-WHERE url = ? AND tabid = ?;
-
+FROM audio
+WHERE url = ? AND playlist_id = ?;
 
 -- name: SetStatus :exec
-UPDATE videos
+UPDATE audio
 SET status = ?
 WHERE uuid = ?;
 
 -- name: GetStatus :exec
 SELECT status
-FROM videos
+FROM audio
 WHERE uuid = ?;
-
--- name: LoadTabs :many
-SELECT *
-FROM tabs;
-
--- name: ChangeTabName :exec
-UPDATE tabs
-SET name = ?
-WHERE id = ?;
-
--- name: AddTab :exec
-INSERT INTO tabs (
-  id, name
-) VALUES (
-  ?, ?
-);
-
--- name: DeleteTab :exec
-DELETE FROM tabs
-WHERE id = ?;
-
--- name: GetLastTabId :one
-SELECT id
-FROM tabs
-ORDER BY id DESC
-LIMIT 1;

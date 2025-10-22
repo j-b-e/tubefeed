@@ -11,30 +11,12 @@
 <body>
 <h1>Tubefeed</h1>
 
-<nav>
-    <div class="tabs" id="tabs-container">
-        {{ template "tablist.html" . }}
-    </div>
-</nav>
 <div>
     <div id="content" class="content">
-        {{ template "tabcontent.html" . }}
+        {{ template "content.html" . }}
     </div>
 </div>
 
-
-
-<script>
-    function switchTab(t) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('button.edit-button').forEach(b => b.style.visibility = 'hidden');
-        button = t.querySelector('button.edit-button')
-        if (button) {
-            button.style.visibility = 'visible';
-        }
-        t.classList.add('active');
-    }
-</script>
 
 </body>
 </html>

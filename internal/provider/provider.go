@@ -6,16 +6,16 @@ import (
 	"github.com/google/uuid"
 )
 
-type ProviderNewVideoFn func(url string) (VideoProvider, error)
+type ProviderNewSourceFn func(url string) (SourceProvider, error)
 
-// VideoProvider can handle Videos of a domain
-type VideoProvider interface {
-	LoadMetadata() (*VideoMeta, error)            // Provider starts requesting metadata
+// SourceProvider can handle Videos of a domain
+type SourceProvider interface {
+	LoadMetadata() (*SourceMeta, error)           // Provider starts requesting metadata
 	Download(id uuid.UUID, basepath string) error // Provider must download audio atomicly to Path
-	Url() string                                  // Url to Website of specific Video
+	Url() string                                  // Url to specific Source
 }
 
-type VideoMeta struct {
+type SourceMeta struct {
 	ProviderID  string // Provider Internal ID
 	Title       string
 	Channel     string

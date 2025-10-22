@@ -9,14 +9,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type Video struct {
-	provider provider.VideoProvider
+type Source struct {
+	provider provider.SourceProvider
 	Status   Status
-	Meta     provider.VideoMeta
+	Meta     provider.SourceMeta
 	ID       uuid.UUID
 }
 
-type VideoProviderList map[string]provider.ProviderNewVideoFn
+type VideoProviderList map[string]provider.ProviderNewSourceFn
 
 type Provider struct {
 	List VideoProviderList
@@ -32,7 +32,7 @@ var (
 	StatusError   Status = "Error"
 )
 
-func (vm *Video) Download(path string) error {
+func (vm *Source) Download(path string) error {
 	if vm.provider == nil {
 		domain, err := utils.ExtractDomain(vm.Meta.URL)
 		if err != nil {
@@ -51,19 +51,19 @@ func (vm *Video) Download(path string) error {
 	return vm.provider.Download(vm.ID, path)
 }
 
-func NewVideo(url string) (Video, error) {
+func NewVideo(url string) (Source, error) {
 	domain, _ := utils.ExtractDomain(url)
 	new := registry.Get(domain)
 	prov, err := new(url)
 	if err != nil {
-		return Video{}, err
+		return Source{}, err
 	}
 
-	meta := provider.VideoMeta{
+	meta := provider.SourceMeta{
 		URL:   prov.Url(),
 		Title: "Loading...",
 	}
-	return Video{
+	return Source{
 		ID:       uuid.New(),
 		Meta:     meta,
 		provider: prov,
@@ -71,7 +71,7 @@ func NewVideo(url string) (Video, error) {
 	}, nil
 }
 
-func (vm *Video) LoadMeta() error {
+func (vm *Source) LoadMeta() error {
 
 	videomd, err := vm.provider.LoadMetadata()
 	if err != nil {

@@ -6,15 +6,15 @@ import (
 	"tubefeed/internal/provider/yt"
 )
 
-var registry = map[string]provider.ProviderNewVideoFn{
+var registry = map[string]provider.ProviderNewSourceFn{
 	"youtube.com": yt.New,
 }
 
-func Register(name string, fn provider.ProviderNewVideoFn) {
+func Register(name string, fn provider.ProviderNewSourceFn) {
 	registry[name] = fn
 }
 
-func Get(name string) provider.ProviderNewVideoFn {
+func Get(name string) provider.ProviderNewSourceFn {
 	if fn, ok := registry[name]; ok {
 		return fn
 	}

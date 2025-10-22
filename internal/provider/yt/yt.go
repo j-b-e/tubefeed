@@ -23,7 +23,7 @@ var (
 )
 
 // New implements ProviderNewVideoFn
-func New(url string) (provider.VideoProvider, error) {
+func New(url string) (provider.SourceProvider, error) {
 	if !strings.Contains(url, "youtube.com") {
 		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
 	}
@@ -68,7 +68,7 @@ func (y *yt) Download(id uuid.UUID, path string) error {
 }
 
 // Refreshes YouTube video metadata
-func (y *yt) LoadMetadata() (*provider.VideoMeta, error) {
+func (y *yt) LoadMetadata() (*provider.SourceMeta, error) {
 	var err error
 
 	cmd := exec.Command("yt-dlp", "--quiet", "--skip-download", "--dump-json", y.Url())
@@ -86,7 +86,7 @@ func (y *yt) LoadMetadata() (*provider.VideoMeta, error) {
 	if result["id"] != y.ytid {
 		return nil, fmt.Errorf("%w: video id from result didnt match", ErrYoutube)
 	}
-	meta := provider.VideoMeta{
+	meta := provider.SourceMeta{
 		Title:   result["title"].(string),
 		Channel: result["uploader"].(string),
 		Length:  time.Duration(int(result["duration"].(float64))) * time.Second,

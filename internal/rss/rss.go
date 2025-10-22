@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 	"tubefeed/internal/meta"
+
+	"github.com/google/uuid"
 )
 
 var ErrRSS = errors.New("rss error")
@@ -64,9 +66,9 @@ func NewRSS(externalUrl string) *RSS {
 }
 
 // Generates a podcast RSS feed with the given metadata
-func (r *RSS) GeneratePodcastFeed(videos []meta.Video, tabname string) (string, error) {
+func (r *RSS) GeneratePodcastFeed(videos []meta.Source, playlist uuid.UUID) (string, error) {
 	channel := PodcastChannel{
-		Title:       fmt.Sprintf("%s - Tubefeed", tabname),
+		Title:       fmt.Sprintf("%s - Tubefeed", playlist.String()), // TODO use playlist  struct to retrieve name
 		Link:        r.ExternalUrl,
 		Description: "A collection of videos as podcast episodes.",
 		Language:    "en-us",
@@ -83,7 +85,7 @@ func (r *RSS) GeneratePodcastFeed(videos []meta.Video, tabname string) (string, 
 		// https://help.apple.com/itc/podcasts_connect/#/itcb54353390
 		item := PodcastItem{
 			Title:       fmt.Sprintf("%s - %s", video.Meta.Channel, video.Meta.Title),
-			Description: fmt.Sprintf("created with Tubefeed on playlist %s", tabname),
+			Description: fmt.Sprintf("created with Tubefeed on playlist %s", playlist.String()),
 			PubDate:     time.Now().Format(rfc2822),
 			Link:        video.Meta.URL,
 			GUID:        video.ID.String(),
