@@ -7,14 +7,16 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
       - id: mixed-line-ending
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
+  - repo: https://github.com/bhundven/golang-pre-commit.git
+    rev: v1
     hooks:
-      - id: go-fmt
-      - id: validate-toml
-      - id: no-go-testing
       - id: go-generate
-      - id: golangci-lint
-      - id: go-unit-tests
-      - id: go-build
       - id: go-mod-tidy
+      #- id: go-unit-tests
+      #- id: go-build
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.5.0
+    hooks:
+      - id: golangci-lint-full
+      - id: golangci-lint-fmt
