@@ -206,7 +206,7 @@ func (a App) streamAudio(c *gin.Context) {
 	audioMutex.Lock()
 
 	if !fileExists(audioFilePath) {
-		video, err := a.Db.GetVideo(ctx, audioUUID)
+		video, err := a.Db.GetItem(ctx, audioUUID)
 		if err != nil {
 			log.Println(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -226,7 +226,7 @@ func (a App) streamAudio(c *gin.Context) {
 
 // Deletes a video by ID from the database
 func (a App) deleteVideo(ctx context.Context, id uuid.UUID) error {
-	err := a.Db.DeleteVideo(ctx, id)
+	err := a.Db.DeleteItem(ctx, id)
 	if err != nil {
 		return err
 	}

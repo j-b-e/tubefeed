@@ -26,7 +26,7 @@ SELECT id, name
 FROM playlist
 WHERE id = ?;
 
--- name: GetVideo :one
+-- name: GetAudio :one
 SELECT title, channel, status, length, url
 FROM audio
 WHERE id = ?

@@ -114,7 +114,7 @@ func (w *Worker) start() {
 			}
 			// save meta to db -> StateMeta
 			item.Status = models.StatusMeta
-			err = w.db.SaveVideoMetadata(ctx, source, item.Playlist, models.StatusMeta)
+			err = w.db.SaveItemMetadata(ctx, source, item.Playlist, models.StatusMeta)
 			if err != nil {
 				return
 			}

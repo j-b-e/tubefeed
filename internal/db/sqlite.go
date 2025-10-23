@@ -48,7 +48,10 @@ func NewDatabase(path string) (db *Database, err error) {
 		queries: sqlc.New(conn),
 		conn:    conn,
 	}
-	err = db.queries.WithTx(tx).AddPlaylist(ctx, sqlc.AddPlaylistParams{ID: uuid.MustParse(models.Default_playlist), Name: "default"})
+	err = db.queries.WithTx(tx).AddPlaylist(
+		ctx,
+		sqlc.AddPlaylistParams{ID: uuid.MustParse(models.Default_playlist), Name: "default"},
+	)
 	if err != nil {
 		return nil, dbErr(err)
 	}
@@ -120,9 +123,9 @@ func (db *Database) GetPlaylistName(ctx context.Context, id uuid.UUID) (string, 
 	return playlist.Name, nil
 }
 
-func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Source, error) {
+func (db *Database) GetItem(ctx context.Context, id uuid.UUID) (meta.Source, error) {
 
-	row, err := db.queries.GetVideo(ctx, id)
+	row, err := db.queries.GetAudio(ctx, id)
 	if err != nil {
 		return meta.Source{}, dbErr(err)
 	}
@@ -144,8 +147,13 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Source, er
 	return video, nil
 }
 
-// Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Source, playlist uuid.UUID, status models.Status) error {
+// SaveItemMetadata writes item metadata to the database
+func (db *Database) SaveItemMetadata(
+	ctx context.Context,
+	video meta.Source,
+	playlist uuid.UUID,
+	status models.Status,
+) error {
 	err := db.queries.SaveMetadata(
 		ctx,
 		sqlc.SaveMetadataParams{
@@ -164,6 +172,7 @@ func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Source, pl
 	return nil
 }
 
+// CheckforDuplicate returns false if the item is already in the playlist
 func (db *Database) CheckforDuplicate(ctx context.Context, url string, playlist uuid.UUID) (bool, error) {
 
 	count, err := db.queries.CountDuplicate(
@@ -182,7 +191,8 @@ func (db *Database) CheckforDuplicate(ctx context.Context, url string, playlist 
 	return true, nil
 }
 
-func (db *Database) DeleteVideo(ctx context.Context, id uuid.UUID) error {
+// DeleteItem from the database
+func (db *Database) DeleteItem(ctx context.Context, id uuid.UUID) error {
 	err := db.queries.DeleteAudio(ctx, id)
 	if err != nil {
 		return dbErr(err)
@@ -190,6 +200,7 @@ func (db *Database) DeleteVideo(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// SetStatus in the database
 func (db *Database) SetStatus(ctx context.Context, id uuid.UUID, status models.Status) error {
 	err := db.queries.SetStatus(
 		ctx,
