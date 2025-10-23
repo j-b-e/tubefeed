@@ -10,10 +10,6 @@ var registry = map[string]provider.ProviderNewSourceFn{
 	"youtube.com": yt.New,
 }
 
-func Register(name string, fn provider.ProviderNewSourceFn) {
-	registry[name] = fn
-}
-
 func Get(name string) provider.ProviderNewSourceFn {
 	if fn, ok := registry[name]; ok {
 		return fn

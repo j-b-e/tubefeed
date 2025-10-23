@@ -20,8 +20,9 @@ type App struct {
 	rss         *rss.RSS
 	ExternalURL string
 	Db          *db.Database
-	worker      worker.Worker
 	version     string
+	request     chan models.Request
+	report      chan models.Request
 }
 
 func Setup(version string) App {
@@ -37,16 +38,25 @@ func Setup(version string) App {
 // Run main app
 func (a App) Run() (err error) {
 
-	var closedb func()
-	a.Db, closedb, err = db.NewDatabase(a.config.DbPath)
+	a.Db, err = db.NewDatabase(a.config.DbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer closedb()
+	defer func() {
+		err = a.Db.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
-	req := make(chan models.Request, 20)
-	defer close(req)
-	a.worker = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath, req)
+	a.request = make(chan models.Request, 20)
+	a.report = make(chan models.Request)
+	defer close(a.request)
+	err = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath, a.request, a.report)
+	if err != nil {
+		panic(err)
+	}
+	go a.reportworker()
 
 	r := gin.Default()
 
@@ -56,14 +66,14 @@ func (a App) Run() (err error) {
 
 	r.GET("/", a.rootHandler)
 
-	// Add a new video by fetching its metadata
-	r.POST("/audio", a.audioHandler)
-	// status audio route
-	r.GET("/audio/status/:id", a.statusAudio)
+	// Add a new item by fetching its metadata
+	r.POST("/new", a.newRequestHandler)
+	// // status audio route
+	// r.GET("/audio/status/:id", a.statusAudio)
 	// Stream or download audio route
 	r.GET("/audio/:id", a.streamAudio)
 
-	// Route to delete a video by ID
+	// Route to delete an item by ID
 	r.DELETE("/audio/:id", a.audioIDhandler)
 
 	r.GET("/rss/:id", a.rssHandler)

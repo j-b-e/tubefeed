@@ -40,8 +40,8 @@ func (a App) rootHandler(c *gin.Context) {
 	})
 }
 
-// POST /audio
-func (a App) audioHandler(c *gin.Context) {
+// POST /new
+func (a App) newRequestHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	videoURL := c.PostForm("youtube_url")
 	if videoURL == "" {
@@ -51,14 +51,7 @@ func (a App) audioHandler(c *gin.Context) {
 		return
 	}
 
-	vid, err := meta.NewVideo(videoURL)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
-
-	duplicate, err := a.Db.CheckforDuplicate(ctx, vid, uuid.MustParse(models.Default_playlist))
+	duplicate, err := a.Db.CheckforDuplicate(ctx, videoURL, uuid.MustParse(models.Default_playlist))
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -69,34 +62,25 @@ func (a App) audioHandler(c *gin.Context) {
 		return
 	}
 
-	err = a.Db.SaveVideoMetadata(ctx, vid, uuid.MustParse(models.Default_playlist), meta.StatusNew)
-	if err != nil {
-		log.Printf("dberror: %v", err)
-		err = a.Db.SetStatus(ctx, vid.ID, meta.StatusError)
-		if err != nil {
-			// errception
-			log.Printf("dberror: %v", err)
-		}
-		return
-	}
-	// send download to worker
-	err = a.worker.Download(vid)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
+	// send request to worker
+	request := models.Request{
+		ID:       uuid.New(),
+		URL:      videoURL,
+		Playlist: uuid.MustParse(models.Default_playlist),
+		Progress: 0,
+		Done:     false,
+		Title:    "unknown",
+		Status:   models.StatusNew,
+		Error:    nil,
 	}
 
-	// Reload the page with the updated video list
-	videometa, err := a.loadVideoMeta(ctx)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+	select {
+	case a.request <- request:
+		c.Status(http.StatusAccepted)
 		return
+	default:
+		c.AbortWithStatusJSON(http.StatusTooManyRequests, `{"error": "too many requests"`)
 	}
-	c.HTML(http.StatusOK, "video_list.html", gin.H{
-		"Videos": videometa,
-	})
 }
 
 // GET /audio/:id
@@ -117,24 +101,6 @@ func (a App) audioIDhandler(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusOK)
-}
-
-// GET /audio/status/:id
-func (a App) statusAudio(c *gin.Context) {
-	ctx := c.Request.Context()
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, fmt.Sprintf("{\"err\": \"%v\"}", err))
-		return
-	}
-	video, err := a.Db.GetVideo(ctx, id)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, err)
-		return
-	}
-	c.HTML(http.StatusOK, "video.html", video)
 }
 
 func (a App) handlecontent(c *gin.Context) {

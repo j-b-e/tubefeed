@@ -2,6 +2,7 @@ package meta
 
 import (
 	"fmt"
+	"tubefeed/internal/models"
 	"tubefeed/internal/provider"
 	"tubefeed/internal/provider/registry"
 	"tubefeed/internal/utils"
@@ -11,7 +12,7 @@ import (
 
 type Source struct {
 	provider provider.SourceProvider
-	Status   Status
+	Status   models.Status
 	Meta     provider.SourceMeta
 	ID       uuid.UUID
 }
@@ -21,16 +22,6 @@ type VideoProviderList map[string]provider.ProviderNewSourceFn
 type Provider struct {
 	List VideoProviderList
 }
-
-type Status string
-
-var (
-	StatusNew     Status = "New"
-	StatusMeta    Status = "FetchingMeta"
-	StatusLoading Status = "Downloading"
-	StatusReady   Status = "Available"
-	StatusError   Status = "Error"
-)
 
 func (vm *Source) Download(path string) error {
 	if vm.provider == nil {
@@ -51,9 +42,12 @@ func (vm *Source) Download(path string) error {
 	return vm.provider.Download(vm.ID, path)
 }
 
-func NewVideo(url string) (Source, error) {
+func NewSource(id uuid.UUID, url string) (Source, error) {
 	domain, _ := utils.ExtractDomain(url)
 	new := registry.Get(domain)
+	if new == nil {
+		return Source{}, fmt.Errorf("domain not supported: %s", domain)
+	}
 	prov, err := new(url)
 	if err != nil {
 		return Source{}, err
@@ -64,10 +58,10 @@ func NewVideo(url string) (Source, error) {
 		Title: "Loading...",
 	}
 	return Source{
-		ID:       uuid.New(),
+		ID:       id,
 		Meta:     meta,
 		provider: prov,
-		Status:   StatusNew,
+		Status:   models.StatusNew,
 	}, nil
 }
 

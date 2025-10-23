@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 	"tubefeed/internal/meta"
+	"tubefeed/internal/models"
 
 	"github.com/google/uuid"
 )
@@ -66,9 +67,9 @@ func NewRSS(externalUrl string) *RSS {
 }
 
 // Generates a podcast RSS feed with the given metadata
-func (r *RSS) GeneratePodcastFeed(videos []meta.Source, playlist uuid.UUID) (string, error) {
+func (r *RSS) GeneratePodcastFeed(items []meta.Source, playlist uuid.UUID, name string) (string, error) {
 	channel := PodcastChannel{
-		Title:       fmt.Sprintf("%s - Tubefeed", playlist.String()), // TODO use playlist  struct to retrieve name
+		Title:       fmt.Sprintf("%s - Tubefeed", name), // TODO use playlist  struct to retrieve name
 		Link:        r.ExternalUrl,
 		Description: "A collection of videos as podcast episodes.",
 		Language:    "en-us",
@@ -76,8 +77,8 @@ func (r *RSS) GeneratePodcastFeed(videos []meta.Source, playlist uuid.UUID) (str
 		Image:       PodcastImage{Href: fmt.Sprintf("http://%s/static/logo.png", r.ExternalUrl)},
 	}
 
-	for _, video := range videos {
-		if video.Status != meta.StatusReady {
+	for _, video := range items {
+		if video.Status != models.StatusReady {
 			continue
 		}
 		audioURL := fmt.Sprintf("http://%s/audio/%s", r.ExternalUrl, video.ID)

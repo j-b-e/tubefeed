@@ -16,3 +16,9 @@ mrproper: clean
 go-mod-update:
 	@go get -u ./...
 	@go mod tidy
+
+sqlc:
+	@go run github.com/sqlc-dev/sqlc/cmd/sqlc compile
+
+air:
+	@air

@@ -12,21 +12,27 @@ import (
 func (a App) rssHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	// Fetch all videos from the database
-	playlistID, err := uuid.Parse(c.Param("playlist"))
+	playlistID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 
-	videos, err := a.Db.LoadPlaylist(ctx, playlistID)
+	playlistName, err := a.Db.GetPlaylistName(ctx, playlistID)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	audio, err := a.Db.LoadAudioFromPlaylist(ctx, playlistID)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 	// Generate Podcast RSS feed with the video metadata
-	rssfeed, err := a.rss.GeneratePodcastFeed(videos, playlistID)
+	rssfeed, err := a.rss.GeneratePodcastFeed(audio, playlistID, playlistName)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)

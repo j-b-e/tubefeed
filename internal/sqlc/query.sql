@@ -1,30 +1,42 @@
 -- name: SaveMetadata :exec
 INSERT OR REPLACE INTO audio (
-  uuid, title, channel, status, length, url, playlist_id
+  id, title, channel, status, length, url, playlist_id
 ) VALUES (
   ?, ?, ?, ?, ?, ?, ?
 );
 
+-- name: AddPlaylist :exec
+INSERT OR REPLACE INTO playlist (
+  id, name
+) VALUES (
+  ?, ?
+);
+
 -- name: LoadDatabase :many
-SELECT uuid, title, channel, status, length, url
+SELECT id, title, channel, status, length, url
 FROM audio;
 
--- name: LoadPlaylist :many
-SELECT uuid, title, channel, status, length, url
+-- name: LoadAudioFromPlaylist :many
+SELECT id, title, channel, status, length, url
 FROM audio
 WHERE playlist_id = ?;
+
+-- name: LoadPlaylist :one
+SELECT id, name
+FROM playlist
+WHERE id = ?;
 
 -- name: GetVideo :one
 SELECT title, channel, status, length, url
 FROM audio
-WHERE uuid = ?
+WHERE id = ?
 LIMIT 1;
 
--- name: DeleteVideo :exec
+-- name: DeleteAudio :exec
 DELETE FROM audio
-WHERE uuid = ?;
+WHERE id = ?;
 
--- name: DeleteVideosFromTab :exec
+-- name: DeleteAudioFromPlaylist :exec
 DELETE FROM audio
 WHERE playlist_id = ?;
 
@@ -36,9 +48,9 @@ WHERE url = ? AND playlist_id = ?;
 -- name: SetStatus :exec
 UPDATE audio
 SET status = ?
-WHERE uuid = ?;
+WHERE id = ?;
 
 -- name: GetStatus :exec
 SELECT status
 FROM audio
-WHERE uuid = ?;
+WHERE id = ?;

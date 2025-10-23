@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 	"tubefeed/internal/meta"
+	"tubefeed/internal/models"
 	"tubefeed/internal/provider"
 
 	"tubefeed/internal/sqlc"
@@ -22,20 +23,44 @@ func dbErr(s any) error {
 
 type Database struct {
 	queries *sqlc.Queries
+	conn    *sql.DB
 }
 
-func NewDatabase(path string) (db *Database, close func(), err error) {
-	sqlite, err := sql.Open("sqlite3", path)
+func NewDatabase(path string) (db *Database, err error) {
+	conn, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, nil, dbErr(err)
+		return nil, dbErr(err)
 	}
-	_, err = sqlite.Exec(sqlc.Schema)
+
+	ctx := context.Background()
+	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, nil, dbErr(err)
+		return nil, err
 	}
-	return &Database{
-		queries: sqlc.New(sqlite),
-	}, func() { _ = sqlite.Close() }, nil
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.ExecContext(ctx, sqlc.Schema)
+	if err != nil {
+		return nil, dbErr(err)
+	}
+
+	db = &Database{
+		queries: sqlc.New(conn),
+		conn:    conn,
+	}
+	err = db.queries.WithTx(tx).AddPlaylist(ctx, sqlc.AddPlaylistParams{ID: uuid.MustParse(models.Default_playlist), Name: "default"})
+	if err != nil {
+		return nil, dbErr(err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func (db *Database) Close() error {
+	return db.conn.Close()
 }
 
 func (db *Database) LoadDatabase(ctx context.Context) ([]meta.Source, error) {
@@ -53,9 +78,9 @@ func (db *Database) LoadDatabase(ctx context.Context) ([]meta.Source, error) {
 			Description: "",
 		}
 		video := meta.Source{
-			ID:     uuid.MustParse(row.Uuid),
+			ID:     row.ID,
 			Meta:   audiomd,
-			Status: meta.Status(row.Status),
+			Status: models.Status(row.Status),
 		}
 		audios = append(audios, video)
 	}
@@ -63,8 +88,8 @@ func (db *Database) LoadDatabase(ctx context.Context) ([]meta.Source, error) {
 	return audios, nil
 }
 
-func (db *Database) LoadPlaylist(ctx context.Context, playlist uuid.UUID) ([]meta.Source, error) {
-	rows, err := db.queries.LoadPlaylist(ctx, sql.NullString{String: playlist.String()})
+func (db *Database) LoadAudioFromPlaylist(ctx context.Context, playlist uuid.UUID) ([]meta.Source, error) {
+	rows, err := db.queries.LoadAudioFromPlaylist(ctx, playlist)
 	if err != nil {
 		return nil, dbErr(err)
 	}
@@ -78,18 +103,26 @@ func (db *Database) LoadPlaylist(ctx context.Context, playlist uuid.UUID) ([]met
 			Description: "",
 		}
 		video := meta.Source{
-			ID:     uuid.MustParse(row.Uuid),
+			ID:     row.ID,
 			Meta:   audiomd,
-			Status: meta.Status(row.Status),
+			Status: models.Status(row.Status),
 		}
 		audios = append(audios, video)
 	}
 	return audios, nil
 }
 
+func (db *Database) GetPlaylistName(ctx context.Context, id uuid.UUID) (string, error) {
+	playlist, err := db.queries.LoadPlaylist(ctx, id)
+	if err != nil {
+		return "", dbErr(err)
+	}
+	return playlist.Name, nil
+}
+
 func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Source, error) {
 
-	row, err := db.queries.GetVideo(ctx, id.String())
+	row, err := db.queries.GetVideo(ctx, id)
 	if err != nil {
 		return meta.Source{}, dbErr(err)
 	}
@@ -105,24 +138,24 @@ func (db *Database) GetVideo(ctx context.Context, id uuid.UUID) (meta.Source, er
 	video := meta.Source{
 		ID:     id,
 		Meta:   videomd,
-		Status: meta.Status(row.Status),
+		Status: models.Status(row.Status),
 	}
 
 	return video, nil
 }
 
 // Saves video metadata to the database
-func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Source, playlist uuid.UUID, status meta.Status) error {
+func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Source, playlist uuid.UUID, status models.Status) error {
 	err := db.queries.SaveMetadata(
 		ctx,
 		sqlc.SaveMetadataParams{
-			Uuid:       video.ID.String(),
+			ID:         video.ID,
 			Title:      video.Meta.Title,
 			Channel:    video.Meta.Channel,
 			Status:     string(status),
 			Length:     sql.NullInt64{Int64: int64(video.Meta.Length.Seconds())},
 			Url:        video.Meta.URL,
-			PlaylistID: sql.NullString{String: playlist.String()},
+			PlaylistID: playlist,
 		},
 	)
 	if err != nil {
@@ -131,13 +164,13 @@ func (db *Database) SaveVideoMetadata(ctx context.Context, video meta.Source, pl
 	return nil
 }
 
-func (db *Database) CheckforDuplicate(ctx context.Context, video meta.Source, playlist uuid.UUID) (bool, error) {
+func (db *Database) CheckforDuplicate(ctx context.Context, url string, playlist uuid.UUID) (bool, error) {
 
 	count, err := db.queries.CountDuplicate(
 		ctx,
 		sqlc.CountDuplicateParams{
-			Url:        video.Meta.URL,
-			PlaylistID: sql.NullString{String: playlist.String(), Valid: true},
+			Url:        url,
+			PlaylistID: playlist,
 		})
 	if err != nil {
 		return false, dbErr(err)
@@ -150,19 +183,19 @@ func (db *Database) CheckforDuplicate(ctx context.Context, video meta.Source, pl
 }
 
 func (db *Database) DeleteVideo(ctx context.Context, id uuid.UUID) error {
-	err := db.queries.DeleteVideo(ctx, id.String())
+	err := db.queries.DeleteAudio(ctx, id)
 	if err != nil {
 		return dbErr(err)
 	}
 	return nil
 }
 
-func (db *Database) SetStatus(ctx context.Context, id uuid.UUID, status meta.Status) error {
+func (db *Database) SetStatus(ctx context.Context, id uuid.UUID, status models.Status) error {
 	err := db.queries.SetStatus(
 		ctx,
 		sqlc.SetStatusParams{
 			Status: string(status),
-			Uuid:   id.String(),
+			ID:     id,
 		},
 	)
 	if err != nil {

@@ -15,10 +15,24 @@ var (
 	clientsMu sync.Mutex
 )
 
-func BroadcastProgress(t *models.Request) {
+func (a App) reportworker() {
+	for msg := range a.report {
+		a.broadcastProgress(&msg)
+	}
+}
+
+func (a App) broadcastProgress(r *models.Request) {
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
-	msg := fmt.Sprintf(`{"id": %d, "progress": %d, "done": %v}`, t.ID, t.Progress, t.Done)
+	var errs string
+	if r.Error == nil {
+		errs = ""
+	} else {
+		errs = *r.Error
+	}
+	msg := fmt.Sprintf(
+		`{"id": "%s", "progress": %d, "done": %v, "status": "%s", "error": %q}`,
+		r.ID, r.Progress, r.Done, r.Status, errs)
 	for ch := range clients {
 		select {
 		case ch <- msg:

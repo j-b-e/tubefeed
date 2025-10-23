@@ -14,3 +14,4 @@ internal/sqlc/models.go
 internal/sqlc/query.sql.go
 audio/
 config/
+tmp/
