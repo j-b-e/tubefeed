@@ -22,3 +22,6 @@ sqlc:
 
 air:
 	@air
+
+update-htmx-dep:
+	curl -fsSL https://cdn.jsdelivr.net/npm/htmx.org/dist/htmx.min.js -o static/htmx.min.js
