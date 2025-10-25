@@ -6,26 +6,27 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	"tubefeed/internal/meta"
 	"tubefeed/internal/models"
-	"tubefeed/internal/provider"
 
 	"tubefeed/internal/sqlc"
 
 	"github.com/google/uuid"
 )
 
+// ErrDatabase is returned for any database related error
 var ErrDatabase = errors.New("sqlite database error")
 
 func dbErr(s any) error {
 	return fmt.Errorf("%w: %v", ErrDatabase, s)
 }
 
+// Database wraps the sqlc generated queries and the database connection
 type Database struct {
 	queries *sqlc.Queries
 	conn    *sql.DB
 }
 
+// NewDatabase initializes the database at the given path
 func NewDatabase(path string) (db *Database, err error) {
 	conn, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -62,10 +63,12 @@ func NewDatabase(path string) (db *Database, err error) {
 	return db, nil
 }
 
+// Close the database connection
 func (db *Database) Close() error {
 	return db.conn.Close()
 }
 
+// LoadDatabase loads all items from the database
 func (db *Database) LoadDatabase(ctx context.Context) (items []models.Request, err error) {
 	rows, err := db.queries.LoadDatabase(ctx)
 	if err != nil {
@@ -76,7 +79,7 @@ func (db *Database) LoadDatabase(ctx context.Context) (items []models.Request, e
 			ID:       row.ID,
 			Title:    row.Title,
 			Playlist: row.PlaylistID,
-			Progress: 0,
+			Progress: 100,
 			Done:     true,
 			Error:    nil,
 			Status:   models.Status(row.Status),
@@ -87,30 +90,32 @@ func (db *Database) LoadDatabase(ctx context.Context) (items []models.Request, e
 	return items, nil
 }
 
-func (db *Database) LoadAudioFromPlaylist(ctx context.Context, playlist uuid.UUID) ([]meta.Source, error) {
+// LoadFromPlaylist loads all items from a specific playlist
+func (db *Database) LoadFromPlaylist(ctx context.Context, playlist uuid.UUID) ([]models.Request, error) {
 	rows, err := db.queries.LoadAudioFromPlaylist(ctx, playlist)
 	if err != nil {
 		return nil, dbErr(err)
 	}
-	var audios []meta.Source
+	var items []models.Request
 	for _, row := range rows {
-		audiomd := provider.SourceMeta{
-			Length:      time.Duration(row.Length.Int64) * time.Second,
-			URL:         row.Url,
-			Channel:     row.Channel,
-			Title:       row.Title,
-			Description: "",
+		request := models.Request{
+			ID:       row.ID,
+			Length:   time.Duration(row.Length.Int64) * time.Second,
+			URL:      row.Url,
+			Channel:  row.Channel,
+			Title:    row.Title,
+			Playlist: playlist,
+			Progress: 100,
+			Done:     true,
+			Error:    nil,
+			Status:   models.StatusReady,
 		}
-		video := meta.Source{
-			ID:     row.ID,
-			Meta:   audiomd,
-			Status: models.Status(row.Status),
-		}
-		audios = append(audios, video)
+		items = append(items, request)
 	}
-	return audios, nil
+	return items, nil
 }
 
+// GetPlaylistName retrieves the name of a playlist by its ID
 func (db *Database) GetPlaylistName(ctx context.Context, id uuid.UUID) (string, error) {
 	playlist, err := db.queries.LoadPlaylist(ctx, id)
 	if err != nil {
@@ -119,46 +124,45 @@ func (db *Database) GetPlaylistName(ctx context.Context, id uuid.UUID) (string, 
 	return playlist.Name, nil
 }
 
-func (db *Database) GetItem(ctx context.Context, id uuid.UUID) (meta.Source, error) {
-
+// GetItem retrieves a single item by its ID
+func (db *Database) GetItem(ctx context.Context, id uuid.UUID) (models.Request, error) {
 	row, err := db.queries.GetAudio(ctx, id)
 	if err != nil {
-		return meta.Source{}, dbErr(err)
+		return models.Request{}, dbErr(err)
 	}
 
-	videomd := provider.SourceMeta{
-
-		Title:   row.Title,
-		Length:  time.Duration(row.Length.Int64) * time.Second,
-		Channel: row.Channel,
-		URL:     row.Url,
+	item := models.Request{
+		ID:       id,
+		Title:    row.Title,
+		Length:   time.Duration(row.Length.Int64) * time.Second,
+		Channel:  row.Channel,
+		URL:      row.Url,
+		Playlist: row.PlaylistID,
+		Progress: 100,
+		Done:     true,
+		Error:    nil,
+		Status:   models.StatusReady,
 	}
 
-	video := meta.Source{
-		ID:     id,
-		Meta:   videomd,
-		Status: models.Status(row.Status),
-	}
-
-	return video, nil
+	return item, nil
 }
 
 // SaveItemMetadata writes item metadata to the database
 func (db *Database) SaveItemMetadata(
 	ctx context.Context,
-	video meta.Source,
+	item models.Request,
 	playlist uuid.UUID,
 	status models.Status,
 ) error {
 	err := db.queries.SaveMetadata(
 		ctx,
 		sqlc.SaveMetadataParams{
-			ID:         video.ID,
-			Title:      video.Meta.Title,
-			Channel:    video.Meta.Channel,
+			ID:         item.ID,
+			Title:      item.Title,
+			Channel:    item.Channel,
 			Status:     string(status),
-			Length:     sql.NullInt64{Int64: int64(video.Meta.Length.Seconds())},
-			Url:        video.Meta.URL,
+			Length:     sql.NullInt64{Int64: int64(item.Length.Seconds())},
+			Url:        item.URL,
 			PlaylistID: playlist,
 		},
 	)
@@ -170,7 +174,6 @@ func (db *Database) SaveItemMetadata(
 
 // CheckforDuplicate returns false if the item is already in the playlist
 func (db *Database) CheckforDuplicate(ctx context.Context, url string, playlist uuid.UUID) (bool, error) {
-
 	count, err := db.queries.CountDuplicate(
 		ctx,
 		sqlc.CountDuplicateParams{

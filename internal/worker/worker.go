@@ -9,7 +9,7 @@ import (
 
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
-	"tubefeed/internal/meta"
+	"tubefeed/internal/downloader"
 	"tubefeed/internal/models"
 	"tubefeed/internal/utils"
 )
@@ -105,20 +105,20 @@ func (w *Worker) start() {
 				}
 			}()
 
-			var source meta.Source
-			source, err = meta.NewSource(item.ID, item.URL, wlog)
+			var source downloader.Source
+			source, err = downloader.NewSource(item.ID, item.URL, wlog)
 			if err != nil {
 				return
 			}
 			item.Status = models.StatusNew
 			// save id & url to db -> StatusNew
-			err = source.LoadMeta()
+			err = source.LoadMeta(item)
 			if err != nil {
 				return
 			}
 			// save meta to db -> StateMeta
 			item.Status = models.StatusMeta
-			err = w.db.SaveItemMetadata(ctx, source, item.Playlist, models.StatusMeta)
+			err = w.db.SaveItemMetadata(ctx, *item, item.Playlist, models.StatusMeta)
 			if err != nil {
 				return
 			}

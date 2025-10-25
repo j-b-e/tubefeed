@@ -1,4 +1,4 @@
-package meta
+package downloader
 
 import (
 	"fmt"
@@ -13,21 +13,20 @@ import (
 
 type Source struct {
 	provider provider.SourceProvider
-	Status   models.Status
-	Meta     provider.SourceMeta
+	URL      string
 	ID       uuid.UUID
 	logger   *slog.Logger
 }
 
-type VideoProviderList map[string]provider.ProviderNewSourceFn
+type ProviderList map[string]provider.ProviderNewSourceFn
 
 type Provider struct {
-	List VideoProviderList
+	List ProviderList
 }
 
 func (vm *Source) Download(path string) error {
 	if vm.provider == nil {
-		domain, err := utils.ExtractDomain(vm.Meta.URL)
+		domain, err := utils.ExtractDomain(vm.URL)
 		if err != nil {
 			return err
 		}
@@ -35,7 +34,7 @@ func (vm *Source) Download(path string) error {
 		if new == nil {
 			return fmt.Errorf("failed to Download")
 		}
-		provider, err := new(vm.Meta.URL, vm.logger)
+		provider, err := new(vm.URL, vm.logger)
 		if err != nil {
 			return err
 		}
@@ -44,37 +43,36 @@ func (vm *Source) Download(path string) error {
 	return vm.provider.Download(vm.ID, path)
 }
 
+// NewSource initializes a new downloader based on the URL domain
 func NewSource(id uuid.UUID, url string, logger *slog.Logger) (Source, error) {
-	domain, _ := utils.ExtractDomain(url)
-	new := registry.Get(domain)
-	if new == nil {
-		return Source{}, fmt.Errorf("domain not supported: %s", domain)
-	}
-	prov, err := new(url, logger)
+	domain, err := utils.ExtractDomain(url)
 	if err != nil {
 		return Source{}, err
 	}
-
-	meta := provider.SourceMeta{
-		URL:   prov.Url(),
-		Title: "Loading...",
+	downloader := registry.Get(domain)
+	if downloader == nil {
+		return Source{}, fmt.Errorf("domain not supported: %s", domain)
+	}
+	prov, err := downloader(url, logger)
+	if err != nil {
+		return Source{}, err
 	}
 	return Source{
 		ID:       id,
-		Meta:     meta,
+		URL:      url,
 		provider: prov,
-		Status:   models.StatusNew,
 		logger:   logger.With("id", id),
 	}, nil
 }
 
-func (vm *Source) LoadMeta() error {
+// LoadMeta loads metadata for the given request
+func (vm *Source) LoadMeta(request *models.Request) error {
 
-	videomd, err := vm.provider.LoadMetadata()
+	metadata, err := vm.provider.LoadMetadata()
 	if err != nil {
 		return err
 	}
-	vm.Meta = *videomd
-
+	request.Title = metadata.Title
+	request.Status = models.StatusMeta
 	return nil
 }

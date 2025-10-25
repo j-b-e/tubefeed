@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"tubefeed/internal/downloader"
 	"tubefeed/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -148,7 +149,7 @@ func (a App) streamAudio(c *gin.Context) {
 	audioMutex.Lock()
 
 	if !fileExists(audioFilePath) {
-		video, err := a.Db.GetItem(ctx, audioUUID)
+		item, err := a.Db.GetItem(ctx, audioUUID)
 		if err != nil {
 			logger.Error(err.Error())
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -156,7 +157,12 @@ func (a App) streamAudio(c *gin.Context) {
 		}
 		go func() {
 			defer audioMutex.Unlock()
-			err := video.Download(audioFilePath)
+			source, err := downloader.NewSource(item.ID, item.URL, a.logger)
+			if err != nil {
+				logger.Error(err.Error())
+				return
+			}
+			err = source.Download(audioFilePath)
 			if err != nil {
 				logger.Error(err.Error())
 				return

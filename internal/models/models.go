@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -21,26 +23,12 @@ var (
 type Request struct {
 	ID       uuid.UUID
 	Title    string
+	Channel  string
 	URL      string
 	Playlist uuid.UUID
+	Length   time.Duration
 	Progress int
 	Done     bool
 	Error    *string
 	Status   Status
 }
-
-// type SourceMeta struct {
-// 	ProviderID  string // Provider Internal ID
-// 	Title       string
-// 	Channel     string
-// 	Length      time.Duration
-// 	Description string
-// 	URL         string
-// }
-
-// type Source struct {
-// 	provider provider.SourceProvider
-// 	Status   Status
-// 	Meta     provider.SourceMeta
-// 	ID       uuid.UUID
-// }

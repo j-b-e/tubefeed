@@ -74,6 +74,7 @@ func (a App) Run() (err error) {
 		panic(err)
 	}
 
+	//gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
 	r.LoadHTMLGlob("templates/*")

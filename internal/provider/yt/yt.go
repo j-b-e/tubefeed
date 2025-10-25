@@ -89,10 +89,11 @@ func (y *yt) LoadMetadata() (*provider.SourceMeta, error) {
 		return nil, fmt.Errorf("%w: video id from result didnt match", ErrYoutube)
 	}
 	meta := provider.SourceMeta{
-		Title:   result["title"].(string),
-		Channel: result["uploader"].(string),
-		Length:  time.Duration(int(result["duration"].(float64))) * time.Second,
-		URL:     y.Url(),
+		ProviderID: y.ytid,
+		Title:      result["title"].(string),
+		Channel:    result["uploader"].(string),
+		Length:     time.Duration(int(result["duration"].(float64))) * time.Second,
+		URL:        y.Url(),
 	}
 
 	return &meta, nil

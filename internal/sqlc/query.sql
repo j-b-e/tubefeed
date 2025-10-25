@@ -27,9 +27,10 @@ FROM playlist
 WHERE id = ?;
 
 -- name: GetAudio :one
-SELECT title, channel, status, length, url
+SELECT title, channel, status, playlist_id, playlist.name as playlist_name, length, url
 FROM audio
-WHERE id = ?
+JOIN playlist ON audio.playlist_id = playlist.id
+WHERE audio.id = ?
 LIMIT 1;
 
 -- name: DeleteAudio :exec
