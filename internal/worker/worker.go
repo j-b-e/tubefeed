@@ -1,8 +1,10 @@
+// Package worker implements the worker pool to process download requests
 package worker
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"tubefeed/internal/config"
@@ -16,6 +18,7 @@ type WorkerManager struct {
 	workers []Worker
 }
 
+// Worker processes download requests
 type Worker struct {
 	id             int
 	report         chan<- models.Request // report channel to broadcast sse
@@ -23,6 +26,7 @@ type Worker struct {
 	db             *db.Database
 	path           string
 	reportInterval time.Duration
+	logger         *slog.Logger
 }
 
 // CreateWorkers starts all configured workers
@@ -32,6 +36,7 @@ func CreateWorkers(
 	path string,
 	req <-chan models.Request,
 	report chan<- models.Request,
+	logger *slog.Logger,
 ) error {
 
 	w := WorkerManager{}
@@ -43,6 +48,7 @@ func CreateWorkers(
 			db:             db,
 			path:           path,
 			reportInterval: config.Load().ReportInterval,
+			logger:         logger.With("id", id),
 		}
 		w.workers = append(w.workers, worker)
 		go worker.start()
@@ -50,24 +56,24 @@ func CreateWorkers(
 	return nil
 }
 
-func (w *Worker) handleError(ctx context.Context, item *models.Request, err error) {
+func (w *Worker) handleError(ctx context.Context, item *models.Request, logger *slog.Logger, err error) {
 	item.Error = utils.StringToPointer(err.Error())
 	item.Status = models.StatusError
-	log.Printf("Error(worker %d): %v, Request: %s", w.id, err, item.ID.String())
+	logger.ErrorContext(ctx, fmt.Sprintf("Error: %v, Request: %#v", err, item))
 	dberr := w.db.SetStatus(ctx, item.ID, item.Status)
 	if dberr != nil {
-		log.Printf("Error(worker %d): %v", w.id, dberr)
+		logger.ErrorContext(ctx, fmt.Sprintf("Error: %v", dberr))
 	}
 	// TODO: Cleanup old files
 	w.report <- *item
 }
 
 func (w *Worker) start() {
-	id := w.id
-	log.Printf("worker %d started.", id)
+	w.logger.Info("worker started")
 	bctx := context.Background()
 	for item := range w.request {
 		ctx, cancel := context.WithTimeout(bctx, time.Duration(time.Hour))
+		wlog := w.logger.With("item", item.ID)
 		ticker := time.NewTicker(w.reportInterval)
 		done := make(chan struct{})
 		// 1. Ticker to report progress
@@ -75,11 +81,11 @@ func (w *Worker) start() {
 			for {
 				select {
 				case <-done:
-					log.Printf("%s - Ticker chan Done", item.ID)
+					wlog.DebugContext(ctx, "Ticker chan Done")
 					ticker.Stop()
 					return
 				case <-ctx.Done():
-					log.Printf("%s - Ticker context Done, %v", item.ID, ctx.Err())
+					wlog.DebugContext(ctx, fmt.Sprintf("Ticker context Done - %v", ctx.Err()))
 					ticker.Stop()
 					return
 				case <-ticker.C:
@@ -89,18 +95,18 @@ func (w *Worker) start() {
 		}()
 		// 2. Handle the request
 		func(item *models.Request) {
-			log.Printf("worker %d started job for %s (%s)", id, item.ID, item.URL)
+			wlog.Info(fmt.Sprintf("started job for %q", item.URL))
 			var err error
 			defer func() {
-				cancel()
 				close(done)
+				cancel()
 				if err != nil {
-					w.handleError(bctx, item, err) // use bctx to handle err outside of worker context
+					w.handleError(bctx, item, wlog, err) // use bctx to handle err outside of worker context
 				}
 			}()
 
 			var source meta.Source
-			source, err = meta.NewSource(item.ID, item.URL)
+			source, err = meta.NewSource(item.ID, item.URL, wlog)
 			if err != nil {
 				return
 			}
@@ -135,7 +141,7 @@ func (w *Worker) start() {
 			}
 		}(&item)
 	}
-	log.Printf("worker %d stopped.", id)
+	w.logger.Info("worker stopped")
 }
 
 // func (w *WorkerManager) Download(src meta.Source) error {

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,30 +10,31 @@ import (
 // GET /rss/:id
 func (a App) getRSSHandler(c *gin.Context) {
 	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "getRSS")
 	// Fetch all videos from the database
 	playlistID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		log.Println(err)
+		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 
 	playlistName, err := a.Db.GetPlaylistName(ctx, playlistID)
 	if err != nil {
-		log.Println(err)
+		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 	audio, err := a.Db.LoadAudioFromPlaylist(ctx, playlistID)
 	if err != nil {
-		log.Println(err)
+		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 	// Generate Podcast RSS feed with the video metadata
 	rssfeed, err := a.rss.GeneratePodcastFeed(audio, playlistID, playlistName)
 	if err != nil {
-		log.Println(err)
+		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}

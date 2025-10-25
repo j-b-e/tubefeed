@@ -2,6 +2,7 @@ package meta
 
 import (
 	"fmt"
+	"log/slog"
 	"tubefeed/internal/models"
 	"tubefeed/internal/provider"
 	"tubefeed/internal/provider/registry"
@@ -15,6 +16,7 @@ type Source struct {
 	Status   models.Status
 	Meta     provider.SourceMeta
 	ID       uuid.UUID
+	logger   *slog.Logger
 }
 
 type VideoProviderList map[string]provider.ProviderNewSourceFn
@@ -33,7 +35,7 @@ func (vm *Source) Download(path string) error {
 		if new == nil {
 			return fmt.Errorf("failed to Download")
 		}
-		provider, err := new(vm.Meta.URL)
+		provider, err := new(vm.Meta.URL, vm.logger)
 		if err != nil {
 			return err
 		}
@@ -42,13 +44,13 @@ func (vm *Source) Download(path string) error {
 	return vm.provider.Download(vm.ID, path)
 }
 
-func NewSource(id uuid.UUID, url string) (Source, error) {
+func NewSource(id uuid.UUID, url string, logger *slog.Logger) (Source, error) {
 	domain, _ := utils.ExtractDomain(url)
 	new := registry.Get(domain)
 	if new == nil {
 		return Source{}, fmt.Errorf("domain not supported: %s", domain)
 	}
-	prov, err := new(url)
+	prov, err := new(url, logger)
 	if err != nil {
 		return Source{}, err
 	}
@@ -62,6 +64,7 @@ func NewSource(id uuid.UUID, url string) (Source, error) {
 		Meta:     meta,
 		provider: prov,
 		Status:   models.StatusNew,
+		logger:   logger.With("id", id),
 	}, nil
 }
 

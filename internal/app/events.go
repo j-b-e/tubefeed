@@ -2,7 +2,7 @@ package app
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"tubefeed/internal/models"
@@ -15,8 +15,8 @@ var (
 	clientsMu sync.Mutex
 )
 
-func (a App) reportworker() {
-	log.Printf("Reportworker for SSE started.")
+func (a App) reportworker(logger *slog.Logger) {
+	logger.Info("reportworker for SSE started")
 	for msg := range a.report {
 		a.broadcastProgress(&msg)
 	}
@@ -70,7 +70,7 @@ func (a App) eventsHandler(c *gin.Context) {
 		case msg := <-messageChan:
 			_, err := fmt.Fprintf(c.Writer, "data: %s\n\n", msg)
 			if err != nil {
-				log.Print(err.Error())
+				a.logger.ErrorContext(c.Request.Context(), err.Error())
 			}
 			flusher.Flush()
 		case <-c.Request.Context().Done():

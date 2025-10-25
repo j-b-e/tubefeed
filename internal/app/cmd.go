@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"tubefeed/internal/config"
 	"tubefeed/internal/db"
@@ -25,6 +25,7 @@ type App struct {
 	request     chan models.Request
 	report      chan models.Request
 	requests    []models.Request
+	logger      *slog.Logger
 }
 
 func Setup(version string) App {
@@ -42,7 +43,7 @@ func (a App) Run() (err error) {
 
 	a.Db, err = db.NewDatabase(a.config.DbPath)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	defer func() {
 		err = a.Db.Close()
@@ -51,14 +52,22 @@ func (a App) Run() (err error) {
 		}
 	}()
 
+	a.logger = a.createLogger()
 	a.request = make(chan models.Request)
 	a.report = make(chan models.Request)
 	defer close(a.request)
-	err = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath, a.request, a.report)
+	err = worker.CreateWorkers(
+		a.config.Workers,
+		a.Db,
+		a.config.AudioPath,
+		a.request,
+		a.report,
+		a.logger.WithGroup("worker"),
+	)
 	if err != nil {
 		panic(err)
 	}
-	go a.reportworker()
+	go a.reportworker(a.logger.WithGroup("reportworker"))
 
 	a.requests, err = a.Db.LoadDatabase(context.Background())
 	if err != nil {

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -15,7 +15,8 @@ import (
 )
 
 type yt struct {
-	ytid string // if set assumes videometadata is fully refreshed from yt
+	ytid   string // if set assumes videometadata is fully refreshed from yt
+	logger *slog.Logger
 }
 
 var (
@@ -23,7 +24,7 @@ var (
 )
 
 // New implements ProviderNewVideoFn
-func New(url string) (provider.SourceProvider, error) {
+func New(url string, logger *slog.Logger) (provider.SourceProvider, error) {
 	if !strings.Contains(url, "youtube.com") && !strings.Contains(url, "youtu.be") {
 		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
 	}
@@ -31,7 +32,7 @@ func New(url string) (provider.SourceProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
 	}
-	return &yt{ytid: ytid}, nil
+	return &yt{ytid: ytid, logger: logger.WithGroup("provider").With("name", "youtube")}, nil
 }
 
 func url(ytid string) string {
@@ -43,11 +44,12 @@ func (y *yt) Url() string {
 }
 
 func (y *yt) Download(id uuid.UUID, path string) error {
+	start := time.Now()
 	_, err := os.Stat(path)
 	if err != nil {
 		return err
 	}
-	log.Printf("⏳ yt: Starting Download: %s", path)
+	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
 	cmd := exec.Command(
 		"yt-dlp",
 		"--quiet",
@@ -58,12 +60,12 @@ func (y *yt) Download(id uuid.UUID, path string) error {
 		"-o", id.String(),
 		y.Url(),
 	)
-	log.Printf("⏳ yt: running cmd:  %s\n", cmd)
+	y.logger.Info(fmt.Sprintf("⏳ Running cmd %s", cmd))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, out)
 	}
-	log.Printf("✅ yt: finished Download: %s - %s", id, y.Url())
+	y.logger.Info(fmt.Sprintf("✅ Finished Download of %s", y.Url()), "download.time", time.Since(start).String())
 	return nil
 }
 
@@ -72,7 +74,7 @@ func (y *yt) LoadMetadata() (*provider.SourceMeta, error) {
 	var err error
 
 	cmd := exec.Command("yt-dlp", "--quiet", "--skip-download", "--dump-json", y.Url())
-	log.Printf("⏳ running cmd:  %s\n", cmd)
+	y.logger.Info(fmt.Sprintf("⏳ running cmd: %s", cmd))
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, out)

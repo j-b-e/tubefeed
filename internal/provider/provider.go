@@ -1,12 +1,13 @@
 package provider
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type ProviderNewSourceFn func(url string) (SourceProvider, error)
+type ProviderNewSourceFn func(url string, logger *slog.Logger) (SourceProvider, error)
 
 // SourceProvider can handle Videos of a domain
 type SourceProvider interface {
