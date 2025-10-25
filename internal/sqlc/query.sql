@@ -13,7 +13,7 @@ INSERT OR REPLACE INTO playlist (
 );
 
 -- name: LoadDatabase :many
-SELECT id, title, channel, status, length, url
+SELECT id, title, channel, status, length, url, playlist_id
 FROM audio;
 
 -- name: LoadAudioFromPlaylist :many

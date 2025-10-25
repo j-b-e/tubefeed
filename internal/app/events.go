@@ -2,12 +2,12 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"tubefeed/internal/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pingcap/log"
 )
 
 var (
@@ -16,6 +16,7 @@ var (
 )
 
 func (a App) reportworker() {
+	log.Printf("Reportworker for SSE started.")
 	for msg := range a.report {
 		a.broadcastProgress(&msg)
 	}
@@ -69,7 +70,7 @@ func (a App) eventsHandler(c *gin.Context) {
 		case msg := <-messageChan:
 			_, err := fmt.Fprintf(c.Writer, "data: %s\n\n", msg)
 			if err != nil {
-				log.Error(err.Error())
+				log.Print(err.Error())
 			}
 			flusher.Flush()
 		case <-c.Request.Context().Done():

@@ -1,8 +1,8 @@
 <p>Copy this link into your Podcast App: <a href="./rss/0353a984-1b53-4e45-bd2c-d4b5da90850f">RSS-Feed</a></p>
-<h2>Add a Youtube Video</h2>
-<form hx-post="/new" hx-target="#audio-list">
-    <label for="youtube_url">YouTube URL:</label>
-    <input type="text" id="youtube_url" name="youtube_url" required>
+<h2>Add a Media URL (supported: youtube.com)</h2>
+<form hx-post="/audio" hx-target="#audio-list">
+    <label for="media-url">Media URL:</label>
+    <input type="text" id="media_url" name="media_url" required>
     <button type="submit" hx-indicator="#indicator">Add Video</button>
 </form>
 
@@ -10,3 +10,50 @@
 <div id="audio-list">
 {{ template "itemlist.html" . }}
 </div>
+
+<ul id="items"></ul>
+</ul>
+
+<script>
+    const evtSource = new EventSource("/events");
+
+    evtSource.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        const id = data.id;
+        let item = document.querySelector(`.item[data-id='${id}']`);
+
+        if (!item) {
+            item = document.createElement('li');
+            item.className = 'item';
+            item.dataset.id = id;
+
+            item.innerHTML = `
+                <div class="header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+                    <strong>${data.id}</strong>
+                    <span class="progress">${data.progress}%</span>
+                    <span class="status">${data.status}</span>
+                </div>
+                <div class="details collapsed">
+                    <em>Filename: ${data.filename || "N/A"}</em>
+                </div>
+            `;
+            // Add new item to the top of the list
+            const itemsList = document.getElementById('items');
+            itemsList.prepend(item);
+            // Fade in
+            item.style.opacity = 0;
+            requestAnimationFrame(() => item.style.transition = 'opacity 0.5s');
+            requestAnimationFrame(() => item.style.opacity = 1);
+        } else {
+            // Update existing item
+            item.querySelector(".progress").textContent = data.progress + "%";
+            item.querySelector(".status").textContent = data.status;
+            if (data.done) {
+                item.querySelector(".status").textContent = "✅ Done";
+            }
+            if (data.error && data.error !== "") {
+                item.querySelector(".status").textContent = "❌ " + data.error;
+            }
+        }
+    };
+    </script>

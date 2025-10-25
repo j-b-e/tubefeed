@@ -9,7 +9,7 @@ import (
 )
 
 // GET /rss/:id
-func (a App) rssHandler(c *gin.Context) {
+func (a App) getRSSHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	// Fetch all videos from the database
 	playlistID, err := uuid.Parse(c.Param("id"))

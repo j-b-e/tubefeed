@@ -3,7 +3,7 @@
 {{ $pending = "false" }}
 {{ end }}
 
-<tr id="audio-{{ .ID }}" {{ if eq $pending "true" }}hx-get="/audio/status/{{ .ID }}" hx-trigger="every 6s" hx-swap="outerHTML"{{ end }}>
+<tr id="audio-{{ .ID }}">
     <td>
     {{ if eq $pending "false" }}
         <audio controls>

@@ -24,7 +24,7 @@ var (
 
 // New implements ProviderNewVideoFn
 func New(url string) (provider.SourceProvider, error) {
-	if !strings.Contains(url, "youtube.com") {
+	if !strings.Contains(url, "youtube.com") && !strings.Contains(url, "youtu.be") {
 		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
 	}
 	ytid, err := extractVideoID(url)

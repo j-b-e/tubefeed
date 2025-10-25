@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func Load() *Config {
-	workers, err := strconv.Atoi(GetEnvOrDefault("WORKERS", "10"))
+	workers, err := strconv.Atoi(GetEnvOrDefault("WORKERS", "20"))
 	if err != nil {
 		panic(err)
 	}

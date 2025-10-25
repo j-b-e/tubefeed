@@ -66,29 +66,25 @@ func (db *Database) Close() error {
 	return db.conn.Close()
 }
 
-func (db *Database) LoadDatabase(ctx context.Context) ([]meta.Source, error) {
+func (db *Database) LoadDatabase(ctx context.Context) (items []models.Request, err error) {
 	rows, err := db.queries.LoadDatabase(ctx)
 	if err != nil {
 		return nil, dbErr(err)
 	}
-	var audios []meta.Source
 	for _, row := range rows {
-		audiomd := provider.SourceMeta{
-			Length:      time.Duration(row.Length.Int64) * time.Second,
-			URL:         row.Url,
-			Channel:     row.Channel,
-			Title:       row.Title,
-			Description: "",
+		item := models.Request{
+			ID:       row.ID,
+			Title:    row.Title,
+			Playlist: row.PlaylistID,
+			Progress: 0,
+			Done:     true,
+			Error:    nil,
+			Status:   models.Status(row.Status),
 		}
-		video := meta.Source{
-			ID:     row.ID,
-			Meta:   audiomd,
-			Status: models.Status(row.Status),
-		}
-		audios = append(audios, video)
+		items = append(items, item)
 	}
 
-	return audios, nil
+	return items, nil
 }
 
 func (db *Database) LoadAudioFromPlaylist(ctx context.Context, playlist uuid.UUID) ([]meta.Source, error) {

@@ -8,6 +8,7 @@ import (
 
 var registry = map[string]provider.ProviderNewSourceFn{
 	"youtube.com": yt.New,
+	"youtu.be":    yt.New,
 }
 
 func Get(name string) provider.ProviderNewSourceFn {

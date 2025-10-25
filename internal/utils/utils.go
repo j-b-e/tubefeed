@@ -17,3 +17,7 @@ func ExtractDomain(rawurl string) (string, error) {
 	}
 	return strings.Join(host[len(host)-2:], "."), nil
 }
+
+func StringToPointer(s string) *string {
+	return &s
+}

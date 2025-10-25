@@ -9,6 +9,7 @@ import (
 	"tubefeed/internal/db"
 	"tubefeed/internal/meta"
 	"tubefeed/internal/models"
+	"tubefeed/internal/utils"
 )
 
 type WorkerManager struct {
@@ -24,6 +25,7 @@ type Worker struct {
 	reportInterval time.Duration
 }
 
+// CreateWorkers starts all configured workers
 func CreateWorkers(
 	count int,
 	db *db.Database,
@@ -48,12 +50,8 @@ func CreateWorkers(
 	return nil
 }
 
-func s2p(s string) *string {
-	return &s
-}
-
 func (w *Worker) handleError(ctx context.Context, item *models.Request, err error) {
-	item.Error = s2p(err.Error())
+	item.Error = utils.StringToPointer(err.Error())
 	item.Status = models.StatusError
 	log.Printf("Error(worker %d): %v, Request: %s", w.id, err, item.ID.String())
 	dberr := w.db.SetStatus(ctx, item.ID, item.Status)
@@ -71,7 +69,7 @@ func (w *Worker) start() {
 	for item := range w.request {
 		ctx, cancel := context.WithTimeout(bctx, time.Duration(time.Hour))
 		ticker := time.NewTicker(w.reportInterval)
-		done := make(chan bool)
+		done := make(chan struct{})
 		// 1. Ticker to report progress
 		go func() {
 			for {
@@ -81,7 +79,7 @@ func (w *Worker) start() {
 					ticker.Stop()
 					return
 				case <-ctx.Done():
-					log.Printf("%s - Ticker context Done", item.ID)
+					log.Printf("%s - Ticker context Done, %v", item.ID, ctx.Err())
 					ticker.Stop()
 					return
 				case <-ticker.C:

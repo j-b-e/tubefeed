@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -23,6 +24,7 @@ type App struct {
 	version     string
 	request     chan models.Request
 	report      chan models.Request
+	requests    []models.Request
 }
 
 func Setup(version string) App {
@@ -49,7 +51,7 @@ func (a App) Run() (err error) {
 		}
 	}()
 
-	a.request = make(chan models.Request, 20)
+	a.request = make(chan models.Request)
 	a.report = make(chan models.Request)
 	defer close(a.request)
 	err = worker.CreateWorkers(a.config.Workers, a.Db, a.config.AudioPath, a.request, a.report)
@@ -58,27 +60,35 @@ func (a App) Run() (err error) {
 	}
 	go a.reportworker()
 
+	a.requests, err = a.Db.LoadDatabase(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
 	r := gin.Default()
 
 	r.LoadHTMLGlob("templates/*")
 
 	r.Static("/static", "./static")
 
-	r.GET("/", a.rootHandler)
+	r.GET("/", a.getRootHandler)
 
-	// Add a new item by fetching its metadata
-	r.POST("/new", a.newRequestHandler)
-	// // status audio route
-	// r.GET("/audio/status/:id", a.statusAudio)
+	// Add a new item
+	r.POST("/audio", a.newRequestHandler)
 	// Stream or download audio route
 	r.GET("/audio/:id", a.streamAudio)
-
 	// Route to delete an item by ID
-	r.DELETE("/audio/:id", a.audioIDhandler)
+	r.DELETE("/audio/:id", a.deleteAudioHandler)
+	//r.PATCH("/audio/:id", a.patchAudioHandler)
 
-	r.GET("/rss/:id", a.rssHandler)
+	// Playlists
+	// r.POST("/playlist", a.createPlaylistHandler)
+	// r.GET("/playlist/:id", a.getPlaylistHandler)
+	// Route to delete an item by ID
+	// r.DELETE("/playlist/:id", a.deletePlaylistHandler)
+	// r.PATCH("/playlist/:id", a.patchPlaylistHandler)
 
-	r.GET("/content/:id", a.handlecontent)
+	r.GET("/rss/:id", a.getRSSHandler)
 
 	r.GET("/version", func(c *gin.Context) {
 		json := []byte(`{"version": "` + a.version + `" }`)

@@ -9,9 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
-	"tubefeed/internal/meta"
 	"tubefeed/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -26,24 +24,17 @@ var (
 )
 
 // GET /
-func (a App) rootHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-	videometa, err := a.loadVideoMeta(ctx)
-	if err != nil {
-		log.Println(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
+func (a App) getRootHandler(c *gin.Context) {
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"playlist": nil,
-		"audio":    videometa,
+		"audio":    a.requests,
 	})
 }
 
 // POST /new
 func (a App) newRequestHandler(c *gin.Context) {
 	ctx := c.Request.Context()
-	videoURL := c.PostForm("youtube_url")
+	videoURL := c.PostForm("media_url")
 	if videoURL == "" {
 		err := fmt.Errorf("no url provided")
 		log.Println(err)
@@ -84,7 +75,7 @@ func (a App) newRequestHandler(c *gin.Context) {
 }
 
 // GET /audio/:id
-func (a App) audioIDhandler(c *gin.Context) {
+func (a App) deleteAudioHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -101,57 +92,6 @@ func (a App) audioIDhandler(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusOK)
-}
-
-func (a App) handlecontent(c *gin.Context) {
-	ctx := c.Request.Context()
-	tabID := c.Param("id")
-	if tabID == "" || tabID == "1" {
-		videometa, err := a.Db.LoadDatabase(ctx)
-		if err != nil {
-			log.Println(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-			return
-		}
-
-		if tabID == "" {
-			c.HTML(http.StatusOK, "index.html", gin.H{
-				"Videos": videometa,
-				"tab":    1,
-			})
-		} else {
-			c.HTML(http.StatusOK, "tabcontent.html", gin.H{
-				"Videos": videometa,
-				"tab":    1,
-			})
-		}
-
-	} else {
-		tabIDi, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			log.Println(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-			return
-		}
-		videometa, err := a.loadVideoMeta(ctx)
-		if err != nil {
-			log.Println(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-			return
-		}
-		c.HTML(http.StatusOK, "tabcontent.html", gin.H{
-			"Videos": videometa,
-			"tab":    tabIDi,
-		})
-	}
-}
-
-func (a App) loadVideoMeta(ctx context.Context) ([]meta.Source, error) {
-	videos, err := a.Db.LoadDatabase(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return videos, nil
 }
 
 func (a App) streamAudio(c *gin.Context) {
