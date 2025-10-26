@@ -8,8 +8,7 @@ RUN go mod download
 
 COPY . .
 RUN apk --no-cache add make
-#ENV CGO_ENABLED=1
-RUN make generate && go build -o main .
+RUN make generate && go build -ldflags "-w" -o main .
 
 
 FROM alpine:latest
