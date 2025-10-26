@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 func ExtractDomain(rawurl string) (string, error) {
@@ -20,4 +22,8 @@ func ExtractDomain(rawurl string) (string, error) {
 
 func StringToPointer(s string) *string {
 	return &s
+}
+
+func GenerateStreamURL(id uuid.UUID) string {
+	return "/audio/" + id.String()
 }

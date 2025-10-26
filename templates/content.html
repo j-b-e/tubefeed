@@ -34,7 +34,8 @@
                     <span class="status">${data.status}</span>
                 </div>
                 <div class="details collapsed">
-                    <em>Filename: ${data.filename || "N/A"}</em>
+                    <em>Title: <div class="title">${data.title || "N/A"}</div></em>
+                    <em>Source: <div class="source">${data.source_url || "N/A"}</div></em>
                 </div>
             `;
             // Add new item to the top of the list
@@ -48,6 +49,8 @@
             // Update existing item
             item.querySelector(".progress").textContent = data.progress + "%";
             item.querySelector(".status").textContent = data.status;
+            item.querySelector(".title").textContent = data.title;
+            item.querySelector(".source").textContent = data.source_url;
             if (data.done) {
                 item.querySelector(".status").textContent = "✅ Done";
             }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -41,7 +42,7 @@ func Setup(version string) App {
 
 // Run main app
 func (a App) Run() (err error) {
-
+	ctx := context.Background()
 	a.Store = a.config.Store
 	defer func() {
 		err = a.Store.Close()
@@ -55,6 +56,7 @@ func (a App) Run() (err error) {
 	a.report = make(chan models.Request)
 	defer close(a.request)
 	err = worker.CreateWorkers(
+		ctx,
 		a.config.Workers,
 		a.Store,
 		a.config.AudioPath,
@@ -69,6 +71,11 @@ func (a App) Run() (err error) {
 
 	//gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+
+	api := r.Group("/api/v1")
+	api.GET("/", a.apiGetRootHandler)
+	api.POST("/audio", a.newRequestHandler)
+	api.GET("/audio/:id", a.streamAudio)
 
 	r.LoadHTMLGlob("templates/*")
 

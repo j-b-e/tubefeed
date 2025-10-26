@@ -31,6 +31,7 @@ type Worker struct {
 
 // CreateWorkers starts all configured workers
 func CreateWorkers(
+	ctx context.Context,
 	count int,
 	db store.Store,
 	path string,
@@ -51,7 +52,7 @@ func CreateWorkers(
 			logger:         logger.With("id", id),
 		}
 		w.workers = append(w.workers, worker)
-		go worker.start()
+		go worker.start(ctx)
 	}
 	return nil
 }
@@ -60,17 +61,16 @@ func (w *Worker) handleError(ctx context.Context, item *models.Request, logger *
 	item.Error = utils.StringToPointer(err.Error())
 	item.Status = models.StatusError
 	logger.ErrorContext(ctx, fmt.Sprintf("Error: %v, Request: %#v", err, item))
-	dberr := w.store.SetStatus(ctx, item.ID, item.Status)
-	if dberr != nil {
-		logger.ErrorContext(ctx, fmt.Sprintf("Error: %v", dberr))
+	err = w.store.SaveItemMetadata(ctx, *item)
+	if err != nil {
+		logger.ErrorContext(ctx, fmt.Sprintf("Error: %v", err))
 	}
 	// TODO: Cleanup old files
 	w.report <- *item
 }
 
-func (w *Worker) start() {
+func (w *Worker) start(bctx context.Context) {
 	w.logger.Info("worker started")
-	bctx := context.Background()
 	for item := range w.request {
 		ctx, cancel := context.WithTimeout(bctx, time.Duration(time.Hour))
 		wlog := w.logger.With("item", item.ID)
@@ -96,8 +96,8 @@ func (w *Worker) start() {
 			}
 		}()
 		// 2. Handle the request
-		func(item *models.Request) {
-			wlog.Info(fmt.Sprintf("started job for %q", item.URL))
+		func(ctx context.Context, item *models.Request) {
+			wlog.InfoContext(ctx, fmt.Sprintf("started job for %q", item.SourceURL))
 			var err error
 			defer func() {
 				close(done)
@@ -108,7 +108,7 @@ func (w *Worker) start() {
 			}()
 
 			var source downloader.Source
-			source, err = downloader.NewSource(item.ID, item.URL, wlog)
+			source, err = downloader.NewSource(item.ID, item.SourceURL, wlog)
 			if err != nil {
 				return
 			}
@@ -120,13 +120,13 @@ func (w *Worker) start() {
 			}
 			// save meta to db -> StateMeta
 			item.Status = models.StatusMeta
-			err = w.store.SaveItemMetadata(ctx, *item, item.Playlist, models.StatusMeta)
+			err = w.store.SaveItemMetadata(ctx, *item)
 			if err != nil {
 				return
 			}
 			// download & extract audio -> StateLoading
 			item.Status = models.StatusLoading
-			err = w.store.SetStatus(ctx, item.ID, models.StatusLoading)
+			err = w.store.SaveItemMetadata(ctx, *item)
 			if err != nil {
 				return
 			}
@@ -137,11 +137,12 @@ func (w *Worker) start() {
 			// complete -> StatusReady
 			item.Status = models.StatusReady
 			item.Done = true
-			err = w.store.SetStatus(ctx, item.ID, models.StatusReady)
+			item.StreamURL = utils.GenerateStreamURL(item.ID)
+			err = w.store.SaveItemMetadata(ctx, *item)
 			if err != nil {
 				return
 			}
-		}(&item)
+		}(ctx, &item)
 	}
 	w.logger.Info("worker stopped")
 }

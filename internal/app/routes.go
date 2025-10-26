@@ -37,7 +37,7 @@ func (a App) getRootHandler(c *gin.Context) {
 	})
 }
 
-// POST /new
+// POST /audio
 func (a App) newRequestHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger := a.logger.With("handler", "newRequest")
@@ -77,14 +77,14 @@ func (a App) newRequestHandler(c *gin.Context) {
 
 	// send request to worker
 	request := models.Request{
-		ID:       uuid.New(),
-		URL:      itemURL,
-		Playlist: uuid.MustParse(models.Default_playlist_id),
-		Progress: 0,
-		Done:     false,
-		Title:    "unknown",
-		Status:   models.StatusNew,
-		Error:    nil,
+		ID:        uuid.New(),
+		SourceURL: itemURL,
+		Playlist:  uuid.MustParse(models.Default_playlist_id),
+		Progress:  0,
+		Done:      false,
+		Title:     "unknown",
+		Status:    models.StatusNew,
+		Error:     nil,
 	}
 
 	select {
@@ -92,7 +92,7 @@ func (a App) newRequestHandler(c *gin.Context) {
 		c.Header("HX-Retarget", "#popup-container")
 		c.Header("HX-Reswap", "beforeend")
 		c.HTML(http.StatusAccepted, "info-popup.html", gin.H{
-			"title": "Request accepted", "message": "please wait...", "item": request.URL,
+			"title": "Request accepted", "message": "please wait...", "item": request.SourceURL,
 		})
 		return
 	default:
@@ -126,6 +126,7 @@ func (a App) deleteAudioHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+	a.report <- models.Request{ID: id, Status: models.StatusDeleted}
 	c.Status(http.StatusOK)
 }
 
@@ -143,14 +144,14 @@ func (a App) streamAudio(c *gin.Context) {
 
 	// Check if the file exists
 	if fileExists(audioFilePath) {
+		if _, ok := c.GetQuery("check"); ok {
+			c.Status(http.StatusOK)
+			return
+		}
 		if _, ok := c.GetQuery("download"); ok {
 			c.Header("Content-Type", "application/octet-stream")
 			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s.mp3", audioID))
 			c.File(audioFilePath)
-			return
-		}
-		if _, ok := c.GetQuery("check"); ok {
-			c.Status(http.StatusOK)
 			return
 		}
 		c.Header("Content-Type", "audio/mpeg")
@@ -190,7 +191,7 @@ func (a App) streamAudio(c *gin.Context) {
 		}
 		go func() {
 			defer audioMutex.Unlock()
-			source, err := downloader.NewSource(item.ID, item.URL, a.logger)
+			source, err := downloader.NewSource(item.ID, item.SourceURL, a.logger)
 			if err != nil {
 				logger.Error(err.Error())
 				return

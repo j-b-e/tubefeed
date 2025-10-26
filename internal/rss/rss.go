@@ -87,7 +87,7 @@ func (r *RSS) GeneratePodcastFeed(items []models.Request, playlist uuid.UUID, na
 			Title:       fmt.Sprintf("%s - %s", item.Channel, item.Title),
 			Description: fmt.Sprintf("created with Tubefeed on playlist %s", playlist.String()),
 			PubDate:     time.Now().Format(rfc2822),
-			Link:        item.URL,
+			Link:        item.SourceURL,
 			GUID:        item.ID.String(),
 			Enclosure: PodcastEnclosure{
 				URL:    audioURL,

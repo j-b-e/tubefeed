@@ -100,16 +100,16 @@ func (db *Database) LoadFromPlaylist(ctx context.Context, playlist uuid.UUID) ([
 	var items []models.Request
 	for _, row := range rows {
 		request := models.Request{
-			ID:       row.ID,
-			Length:   time.Duration(row.Length.Int64) * time.Second,
-			URL:      row.Url,
-			Channel:  row.Channel,
-			Title:    row.Title,
-			Playlist: playlist,
-			Progress: 100,
-			Done:     true,
-			Error:    nil,
-			Status:   models.StatusReady,
+			ID:        row.ID,
+			Length:    time.Duration(row.Length.Int64) * time.Second,
+			SourceURL: row.SourceUrl,
+			Channel:   row.Channel,
+			Title:     row.Title,
+			Playlist:  playlist,
+			Progress:  100,
+			Done:      true,
+			Error:     nil,
+			Status:    models.StatusReady,
 		}
 		items = append(items, request)
 	}
@@ -133,16 +133,16 @@ func (db *Database) GetItem(ctx context.Context, id uuid.UUID) (models.Request, 
 	}
 
 	item := models.Request{
-		ID:       id,
-		Title:    row.Title,
-		Length:   time.Duration(row.Length.Int64) * time.Second,
-		Channel:  row.Channel,
-		URL:      row.Url,
-		Playlist: row.PlaylistID,
-		Progress: 100,
-		Done:     true,
-		Error:    nil,
-		Status:   models.StatusReady,
+		ID:        id,
+		Title:     row.Title,
+		Length:    time.Duration(row.Length.Int64) * time.Second,
+		Channel:   row.Channel,
+		SourceURL: row.SourceUrl,
+		Playlist:  row.PlaylistID,
+		Progress:  100,
+		Done:      true,
+		Error:     nil,
+		Status:    models.StatusReady,
 	}
 
 	return item, nil
@@ -152,8 +152,6 @@ func (db *Database) GetItem(ctx context.Context, id uuid.UUID) (models.Request, 
 func (db *Database) SaveItemMetadata(
 	ctx context.Context,
 	item models.Request,
-	playlist uuid.UUID,
-	status models.Status,
 ) error {
 	err := db.queries.SaveMetadata(
 		ctx,
@@ -161,10 +159,11 @@ func (db *Database) SaveItemMetadata(
 			ID:         item.ID,
 			Title:      item.Title,
 			Channel:    item.Channel,
-			Status:     string(status),
+			Status:     string(item.Status),
 			Length:     sql.NullInt64{Int64: int64(item.Length.Seconds())},
-			Url:        item.URL,
-			PlaylistID: playlist,
+			SourceUrl:  item.SourceURL,
+			PlaylistID: item.Playlist,
+			UpdatedAt:  sql.NullTime{Time: time.Now(), Valid: true},
 		},
 	)
 	if err != nil {
@@ -174,11 +173,11 @@ func (db *Database) SaveItemMetadata(
 }
 
 // CheckforDuplicate returns false if the item is already in the playlist
-func (db *Database) CheckforDuplicate(ctx context.Context, url string, playlist uuid.UUID) (bool, error) {
+func (db *Database) CheckforDuplicate(ctx context.Context, sourceurl string, playlist uuid.UUID) (bool, error) {
 	count, err := db.queries.CountDuplicate(
 		ctx,
 		sqlc.CountDuplicateParams{
-			Url:        url,
+			SourceUrl:  sourceurl,
 			PlaylistID: playlist,
 		})
 	if err != nil {
@@ -194,21 +193,6 @@ func (db *Database) CheckforDuplicate(ctx context.Context, url string, playlist 
 // DeleteItem from the database
 func (db *Database) DeleteItem(ctx context.Context, id uuid.UUID) error {
 	err := db.queries.DeleteAudio(ctx, id)
-	if err != nil {
-		return dbErr(err)
-	}
-	return nil
-}
-
-// SetStatus in the database
-func (db *Database) SetStatus(ctx context.Context, id uuid.UUID, status models.Status) error {
-	err := db.queries.SetStatus(
-		ctx,
-		sqlc.SetStatusParams{
-			Status: string(status),
-			ID:     id,
-		},
-	)
 	if err != nil {
 		return dbErr(err)
 	}

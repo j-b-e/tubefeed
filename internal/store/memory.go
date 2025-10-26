@@ -55,9 +55,9 @@ func (m *memory) GetPlaylistName(_ context.Context, id uuid.UUID) (string, error
 	return "", fmt.Errorf("playlist not found")
 }
 
-func (m *memory) CheckforDuplicate(_ context.Context, url string, _ uuid.UUID) (bool, error) {
+func (m *memory) CheckforDuplicate(_ context.Context, sourceurl string, _ uuid.UUID) (bool, error) {
 	for _, item := range m.items {
-		if item.URL == url {
+		if item.SourceURL == sourceurl {
 			return true, nil
 		}
 	}
@@ -74,9 +74,7 @@ func (m *memory) SetStatus(_ context.Context, id uuid.UUID, status models.Status
 
 }
 
-func (m *memory) SaveItemMetadata(_ context.Context, item models.Request, playlist uuid.UUID, status models.Status) error {
-	item.Playlist = playlist
-	item.Status = status
+func (m *memory) SaveItemMetadata(_ context.Context, item models.Request) error {
 	m.items[item.ID] = &item
 	return nil
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -25,18 +26,10 @@ func (a App) reportworker(logger *slog.Logger) {
 func (a App) broadcastProgress(r *models.Request) {
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
-	var errs string
-	if r.Error == nil {
-		errs = ""
-	} else {
-		errs = *r.Error
-	}
-	msg := fmt.Sprintf(
-		`{"id": "%s", "progress": %d, "done": %v, "status": "%s", "error": %q}`,
-		r.ID, r.Progress, r.Done, r.Status, errs)
+	msg, _ := json.Marshal(r)
 	for ch := range clients {
 		select {
-		case ch <- msg:
+		case ch <- string(msg):
 		default:
 		}
 	}

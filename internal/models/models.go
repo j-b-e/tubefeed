@@ -21,18 +21,20 @@ var (
 	StatusReady     Status = "Available"
 	StatusError     Status = "Error"
 	StatusDuplicate Status = "Duplicate"
+	StatusDeleted   Status = "Deleted"
 )
 
 // Request represents a media download request
 type Request struct {
-	ID       uuid.UUID
-	Title    string
-	Channel  string
-	URL      string
-	Playlist uuid.UUID
-	Length   time.Duration
-	Progress int
-	Done     bool
-	Error    *string
-	Status   Status
+	ID        uuid.UUID     `json:"id"`
+	Title     string        `json:"title"`
+	Channel   string        `json:"channel,omitempty"`
+	SourceURL string        `json:"source_url"`
+	Playlist  uuid.UUID     `json:"playlist_id"`
+	Length    time.Duration `json:"length"`
+	Progress  int           `json:"progress"`
+	Done      bool          `json:"done"`
+	Error     *string       `json:"error,omitempty"`
+	Status    Status        `json:"status"`
+	StreamURL string        `json:"stream_url,omitempty"`
 }
