@@ -7,14 +7,14 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN apk --no-cache add gcc musl-dev sqlite-dev make
-ENV CGO_ENABLED=1
+RUN apk --no-cache add make
+#ENV CGO_ENABLED=1
 RUN make generate && go build -o main .
 
 
 FROM alpine:latest
 
-RUN apk --no-cache add curl python3 sqlite sqlite-libs ffmpeg
+RUN apk --no-cache add curl python3 ffmpeg
 WORKDIR /app
 RUN mkdir -p ./.cache ./audio
 COPY --from=builder /app/main .

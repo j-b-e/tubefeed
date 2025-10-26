@@ -11,7 +11,7 @@ import (
 	"tubefeed/internal/sqlc"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3" // load SQLite driver
+	_ "modernc.org/sqlite" // load SQLite driver
 )
 
 // ErrDatabase is returned for any database related error
