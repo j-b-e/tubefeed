@@ -125,7 +125,6 @@ func (y *yt) LoadMetadata() (*provider.SourceMeta, error) {
 		Length:     time.Duration(int(result["duration"].(float64))) * time.Second,
 		URL:        y.Url(),
 	}
-
 	return &meta, nil
 }
 

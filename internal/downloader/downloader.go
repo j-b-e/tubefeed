@@ -79,5 +79,6 @@ func (vm *Source) LoadMeta(request *models.Request) error {
 	}
 	request.Title = metadata.Title
 	request.Status = models.StatusMeta
+	request.URL = metadata.URL
 	return nil
 }
