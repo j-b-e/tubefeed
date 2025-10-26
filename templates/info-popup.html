@@ -1,6 +1,6 @@
-<div class="error-popup">
+<div class="info-popup">
     <button class="popup-close" onclick="this.parentElement.remove()">×</button>
-    <p class="popup-message"><strong>{{ .title }}:</strong> {{.message}}</p>
+    <p class="popup-message"><strong>{{ .title }}</strong> {{ .message }}</p>
     <script>
         (function() {
             const popup = document.currentScript.parentElement;

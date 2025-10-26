@@ -52,7 +52,7 @@ func NewSqliteDb(path string) (Store, error) {
 	}
 	err = db.queries.WithTx(tx).AddPlaylist(
 		ctx,
-		sqlc.AddPlaylistParams{ID: uuid.MustParse(models.Default_playlist), Name: "default"},
+		sqlc.AddPlaylistParams{ID: uuid.MustParse(models.Default_playlist_id), Name: models.Default_playlist_name},
 	)
 	if err != nil {
 		return nil, dbErr(err)

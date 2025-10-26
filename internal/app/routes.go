@@ -31,8 +31,9 @@ func (a App) getRootHandler(c *gin.Context) {
 		return
 	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
-		"playlist": nil,
-		"Items":    requests,
+		"playlist_name": models.Default_playlist_name,
+		"playlist_id":   models.Default_playlist_id,
+		"Items":         requests,
 	})
 }
 
@@ -48,22 +49,28 @@ func (a App) newRequestHandler(c *gin.Context) {
 		c.Header("HX-Retarget", "#popup-container")
 		c.Header("HX-Reswap", "beforeend")
 		c.HTML(http.StatusBadRequest, "error-popup.html", gin.H{
-			"title": "Error", "message": "No url provided", "item": "",
+			"title":   "Error",
+			"message": "No url provided",
+			"item":    "",
+			"errorid": uuid.New().String(),
 		})
 		return
 	}
 
-	duplicate, err := a.Store.CheckforDuplicate(ctx, itemURL, uuid.MustParse(models.Default_playlist))
+	a.checkMu.Lock()
+	duplicate, err := a.Store.CheckforDuplicate(ctx, itemURL, uuid.MustParse(models.Default_playlist_id))
+	a.checkMu.Unlock()
 	if err != nil {
 		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+
 	if duplicate {
 		c.Header("HX-Retarget", "#popup-container")
 		c.Header("HX-Reswap", "beforeend")
 		c.HTML(http.StatusConflict, "error-popup.html", gin.H{
-			"title": "Conflict", "message": "Media already present",
+			"title": "Conflict", "message": "Media already present", "item": itemURL, "errorid": uuid.New().String(),
 		})
 		return
 	}
@@ -72,7 +79,7 @@ func (a App) newRequestHandler(c *gin.Context) {
 	request := models.Request{
 		ID:       uuid.New(),
 		URL:      itemURL,
-		Playlist: uuid.MustParse(models.Default_playlist),
+		Playlist: uuid.MustParse(models.Default_playlist_id),
 		Progress: 0,
 		Done:     false,
 		Title:    "unknown",
@@ -82,15 +89,22 @@ func (a App) newRequestHandler(c *gin.Context) {
 
 	select {
 	case a.request <- request:
-		c.Status(http.StatusAccepted)
+		c.Header("HX-Retarget", "#popup-container")
+		c.Header("HX-Reswap", "beforeend")
+		c.HTML(http.StatusAccepted, "info-popup.html", gin.H{
+			"title": "Request accepted", "message": "please wait...", "item": request.URL,
+		})
 		return
 	default:
 		c.Header("HX-Retarget", "#popup-container")
 		c.Header("HX-Reswap", "beforeend")
 		c.HTML(http.StatusTooManyRequests, "error-popup.html", gin.H{
-			"title": "Error", "message": "Too many requests, please try again later", "item": itemURL,
+			"title":   "Error",
+			"message": "Too many requests, please try again later",
+			"item":    itemURL,
+			"errorid": uuid.New().String(),
 		})
-
+		return
 	}
 }
 

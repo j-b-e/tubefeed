@@ -1,4 +1,4 @@
-<p>Copy this link into your Podcast App: <a href="./rss/0353a984-1b53-4e45-bd2c-d4b5da90850f">RSS-Feed</a></p>
+<p>Copy this link into your Podcast App: <a href="./rss/{{ .playlist_id }}">RSS-Feed</a></p>
 <h2>Add a Media URL (supported: youtube.com)</h2>
 <form hx-post="/audio" hx-target="#audio-list" hx-target-error="#popup-container">
     <label for="media-url">Media URL:</label>
@@ -6,9 +6,7 @@
     <button type="submit" hx-indicator="#indicator">Add Media</button>
 </form>
 
-<div id="popup-container"></div>
-
-<h2>Playlist</h2>
+<h2>Playlist {{ .playlist_name }} </h2>
 <div id="audio-list">
 {{ template "itemlist.html" . }}
 </div>

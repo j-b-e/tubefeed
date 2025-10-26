@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"tubefeed/internal/config"
 	"tubefeed/internal/models"
 	"tubefeed/internal/rss"
@@ -23,6 +24,7 @@ type App struct {
 	request     chan models.Request
 	report      chan models.Request
 	logger      *slog.Logger
+	checkMu     *sync.Mutex
 }
 
 // Setup initializes the app with the given version
@@ -33,6 +35,7 @@ func Setup(version string) App {
 		config:  c,
 		rss:     rss.NewRSS(c.ExternalURL),
 		version: version,
+		checkMu: new(sync.Mutex),
 	}
 }
 

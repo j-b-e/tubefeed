@@ -145,14 +145,3 @@ func (w *Worker) start() {
 	}
 	w.logger.Info("worker stopped")
 }
-
-// func (w *WorkerManager) Download(src meta.Source) error {
-// 	req := models.Request{ID: uuid.New(), Playlist: uuid.MustParse(models.Default_playlist), Progress: 0, Done: false}
-// 	select {
-// 	case w.request <- req:
-// 		log.Printf("Work Queued: %s", src.Meta.URL)
-// 		return nil
-// 	default:
-// 		return fmt.Errorf("Worker Queue is full")
-// 	}
-// }

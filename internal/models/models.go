@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	Default_playlist = "0353a984-1b53-4e45-bd2c-d4b5da90850f"
+	Default_playlist_id   = "0353a984-1b53-4e45-bd2c-d4b5da90850f"
+	Default_playlist_name = "default"
 )
 
 type Status string

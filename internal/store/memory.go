@@ -19,7 +19,7 @@ func NewMemoryStore() Store {
 		items:    make(map[uuid.UUID]*models.Request),
 		playlist: make(map[uuid.UUID]string),
 	}
-	_ = m.AddPlaylist(context.Background(), uuid.MustParse(models.Default_playlist), "default")
+	_ = m.AddPlaylist(context.Background(), uuid.MustParse(models.Default_playlist_id), models.Default_playlist_name)
 	return m
 }
 

@@ -128,20 +128,68 @@ body {
     /* Ensures long words break into new lines */
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+.info-popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #33be38;
+    color: white;
+    padding: 16px 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    max-width: 400px;
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
 }
 
-@keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+.error-popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #dc3545;
+    color: white;
+    padding: 16px 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    max-width: 400px;
+    z-index: 9999;
+    animation: slideIn 0.3s ease-out;
 }
 
-.animate-fade-in {
-    animation: fadeIn 0.3s ease-in;
+.popup-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    float: right;
+    margin: -4px -4px 0 10px;
+    padding: 0;
+    line-height: 1;
 }
 
-.animate-fade-out {
-    animation: fadeOut 0.3s ease-out;
+.popup-message {
+    margin: 0;
+    font-size: 14px;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Ensure popup container doesn't affect layout */
+#popup-container {
+    position: relative;
+    pointer-events: none;
+}
+
+#popup-container > * {
+    pointer-events: auto;
 }
