@@ -1,6 +1,7 @@
 package yt
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,7 +43,7 @@ func (y *yt) Url() string {
 	return url(y.ytid)
 }
 
-// func (y *yt) DownloadStream() (reader io.Reader, err error) {
+// func (y *yt) DownloadStream(ctx context.Context) (reader io.Reader, err error) {
 // 	start := time.Now()
 // 	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
 // 	cmd := exec.Command(
@@ -76,11 +77,12 @@ func (y *yt) Url() string {
 // 	return reader, nil
 // }
 
-func (y *yt) Download(id uuid.UUID, path string) error {
+func (y *yt) Download(ctx context.Context, id uuid.UUID, path string) error {
 	start := time.Now()
 
 	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		ctx,
 		"yt-dlp",
 		"--quiet",
 		"--extract-audio",
@@ -100,10 +102,16 @@ func (y *yt) Download(id uuid.UUID, path string) error {
 }
 
 // Refreshes YouTube video metadata
-func (y *yt) LoadMetadata() (*provider.SourceMeta, error) {
+func (y *yt) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) {
 	var err error
-
-	cmd := exec.Command("yt-dlp", "--quiet", "--skip-download", "--dump-json", y.Url())
+	cmd := exec.CommandContext(
+		ctx,
+		"yt-dlp",
+		"--quiet",
+		"--skip-download",
+		"--dump-json",
+		y.Url(),
+	)
 	y.logger.Info(fmt.Sprintf("⏳ running cmd: %s", cmd))
 	out, err := cmd.Output()
 	if err != nil {

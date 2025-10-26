@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -11,8 +12,8 @@ type ProviderNewSourceFn func(url string, logger *slog.Logger) (SourceProvider, 
 
 // SourceProvider can handle MEdia of a domain
 type SourceProvider interface {
-	LoadMetadata() (*SourceMeta, error)       // Provider starts requesting metadata
-	Download(id uuid.UUID, path string) error // Provider downloads Source to path atomically
+	LoadMetadata(ctx context.Context) (*SourceMeta, error)         // Provider starts requesting metadata
+	Download(ctx context.Context, id uuid.UUID, path string) error // Provider downloads Source to path atomically
 	//DownloadStream(id uuid.UUID) (io.Reader, error) // Download Source and return a Reader
 	Url() string // Url to specific Source
 }

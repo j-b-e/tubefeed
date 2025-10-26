@@ -114,7 +114,7 @@ func (w *Worker) start(bctx context.Context) {
 			}
 			item.Status = models.StatusNew
 			// save id & url to db -> StatusNew
-			err = source.LoadMeta(item)
+			err = source.LoadMeta(ctx, item)
 			if err != nil {
 				return
 			}
@@ -130,7 +130,7 @@ func (w *Worker) start(bctx context.Context) {
 			if err != nil {
 				return
 			}
-			err = source.Download(w.path)
+			err = source.Download(ctx, w.path)
 			if err != nil {
 				return
 			}

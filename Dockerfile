@@ -10,7 +10,6 @@ COPY . .
 RUN apk --no-cache add make
 RUN make generate && go build -ldflags "-w" -o main .
 
-
 FROM alpine:latest
 
 RUN apk --no-cache add curl python3 ffmpeg

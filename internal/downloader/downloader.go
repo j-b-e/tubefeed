@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -25,7 +26,7 @@ type Provider struct {
 	List ProviderList
 }
 
-func (vm *Source) Download(path string) error {
+func (vm *Source) Download(ctx context.Context, path string) error {
 	if vm.provider == nil {
 		domain, err := utils.ExtractDomain(vm.URL)
 		if err != nil {
@@ -45,7 +46,7 @@ func (vm *Source) Download(path string) error {
 	if err != nil {
 		return err
 	}
-	return vm.provider.Download(vm.ID, path)
+	return vm.provider.Download(ctx, vm.ID, path)
 }
 
 // NewSource initializes a new downloader based on the URL domain
@@ -54,26 +55,26 @@ func NewSource(id uuid.UUID, url string, logger *slog.Logger) (Source, error) {
 	if err != nil {
 		return Source{}, err
 	}
-	downloader := registry.Get(domain)
-	if downloader == nil {
+	newprovider := registry.Get(domain)
+	if newprovider == nil {
 		return Source{}, fmt.Errorf("domain not supported: %s", domain)
 	}
-	prov, err := downloader(url, logger)
+	provider, err := newprovider(url, logger)
 	if err != nil {
 		return Source{}, err
 	}
 	return Source{
 		ID:       id,
 		URL:      url,
-		provider: prov,
+		provider: provider,
 		logger:   logger.With("id", id),
 	}, nil
 }
 
 // LoadMeta loads metadata for the given request
-func (vm *Source) LoadMeta(request *models.Request) error {
+func (vm *Source) LoadMeta(ctx context.Context, request *models.Request) error {
 
-	metadata, err := vm.provider.LoadMetadata()
+	metadata, err := vm.provider.LoadMetadata(ctx)
 	if err != nil {
 		return err
 	}
