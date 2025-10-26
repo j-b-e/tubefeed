@@ -9,15 +9,17 @@ import (
 
 type ProviderNewSourceFn func(url string, logger *slog.Logger) (SourceProvider, error)
 
-// SourceProvider can handle Videos of a domain
+// SourceProvider can handle MEdia of a domain
 type SourceProvider interface {
-	LoadMetadata() (*SourceMeta, error)           // Provider starts requesting metadata
-	Download(id uuid.UUID, basepath string) error // Provider must download audio atomicly to Path
-	Url() string                                  // Url to specific Source
+	LoadMetadata() (*SourceMeta, error)       // Provider starts requesting metadata
+	Download(id uuid.UUID, path string) error // Provider downloads Source to path atomically
+	//DownloadStream(id uuid.UUID) (io.Reader, error) // Download Source and return a Reader
+	Url() string // Url to specific Source
 }
 
 type SourceMeta struct {
-	ProviderID  string // Provider Internal ID
+	ID          uuid.UUID // for later when id is removed from Download() signature
+	ProviderID  string    // Provider Internal ID
 	Title       string
 	Channel     string
 	Length      time.Duration

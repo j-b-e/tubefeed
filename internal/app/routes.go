@@ -43,7 +43,7 @@ func (a App) newRequestHandler(c *gin.Context) {
 		return
 	}
 
-	duplicate, err := a.Db.CheckforDuplicate(ctx, videoURL, uuid.MustParse(models.Default_playlist))
+	duplicate, err := a.Store.CheckforDuplicate(ctx, videoURL, uuid.MustParse(models.Default_playlist))
 	if err != nil {
 		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -149,7 +149,7 @@ func (a App) streamAudio(c *gin.Context) {
 	audioMutex.Lock()
 
 	if !fileExists(audioFilePath) {
-		item, err := a.Db.GetItem(ctx, audioUUID)
+		item, err := a.Store.GetItem(ctx, audioUUID)
 		if err != nil {
 			logger.Error(err.Error())
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
@@ -174,7 +174,7 @@ func (a App) streamAudio(c *gin.Context) {
 
 // Deletes a video by ID from the database
 func (a App) deleteVideo(ctx context.Context, id uuid.UUID) error {
-	err := a.Db.DeleteItem(ctx, id)
+	err := a.Store.DeleteItem(ctx, id)
 	if err != nil {
 		return err
 	}

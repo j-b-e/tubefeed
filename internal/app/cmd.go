@@ -6,21 +6,20 @@ import (
 	"log/slog"
 	"net/http"
 	"tubefeed/internal/config"
-	"tubefeed/internal/db"
 	"tubefeed/internal/models"
 	"tubefeed/internal/rss"
+	"tubefeed/internal/store"
 	"tubefeed/internal/worker"
 
 	"github.com/gin-gonic/gin"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
+// App defintion
 type App struct {
 	config      *config.Config
 	rss         *rss.RSS
 	ExternalURL string
-	Db          *db.Database
+	Store       store.Store
 	version     string
 	request     chan models.Request
 	report      chan models.Request
@@ -28,6 +27,7 @@ type App struct {
 	logger      *slog.Logger
 }
 
+// Setup initializes the app with the given version
 func Setup(version string) App {
 	c := config.Load()
 
@@ -41,12 +41,9 @@ func Setup(version string) App {
 // Run main app
 func (a App) Run() (err error) {
 
-	a.Db, err = db.NewDatabase(a.config.DbPath)
-	if err != nil {
-		panic(err)
-	}
+	a.Store = a.config.Store
 	defer func() {
-		err = a.Db.Close()
+		err = a.Store.Close()
 		if err != nil {
 			panic(err)
 		}
@@ -58,7 +55,7 @@ func (a App) Run() (err error) {
 	defer close(a.request)
 	err = worker.CreateWorkers(
 		a.config.Workers,
-		a.Db,
+		a.Store,
 		a.config.AudioPath,
 		a.request,
 		a.report,
@@ -69,7 +66,7 @@ func (a App) Run() (err error) {
 	}
 	go a.reportworker(a.logger.WithGroup("reportworker"))
 
-	a.requests, err = a.Db.LoadDatabase(context.Background())
+	a.requests, err = a.Store.LoadDatabase(context.Background())
 	if err != nil {
 		panic(err)
 	}

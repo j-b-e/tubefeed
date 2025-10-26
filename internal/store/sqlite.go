@@ -1,4 +1,4 @@
-package db
+package store
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"tubefeed/internal/sqlc"
 
 	"github.com/google/uuid"
+	_ "github.com/mattn/go-sqlite3" // load SQLite driver
 )
 
 // ErrDatabase is returned for any database related error
@@ -26,8 +27,8 @@ type Database struct {
 	conn    *sql.DB
 }
 
-// NewDatabase initializes the database at the given path
-func NewDatabase(path string) (db *Database, err error) {
+// NewSqliteDb initializes the database at the given path
+func NewSqliteDb(path string) (Store, error) {
 	conn, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, dbErr(err)
@@ -45,7 +46,7 @@ func NewDatabase(path string) (db *Database, err error) {
 		return nil, dbErr(err)
 	}
 
-	db = &Database{
+	db := &Database{
 		queries: sqlc.New(conn),
 		conn:    conn,
 	}

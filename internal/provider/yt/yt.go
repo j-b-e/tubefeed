@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -43,12 +42,43 @@ func (y *yt) Url() string {
 	return url(y.ytid)
 }
 
+// func (y *yt) DownloadStream() (reader io.Reader, err error) {
+// 	start := time.Now()
+// 	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
+// 	cmd := exec.Command(
+// 		"yt-dlp",
+// 		"--quiet",
+// 		"--extract-audio",
+// 		"--audio-format", "mp3",
+// 		"-o", "-",
+// 		y.Url(),
+// 	)
+
+// 	stdout, err := cmd.StdoutPipe()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("%w: failed stdout pipe for cmd %s: %v", ErrYoutube, cmd, err)
+// 	}
+// 	stderr, err := cmd.StderrPipe()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("%w: failed stderr pipe for cmd %s: %v", ErrYoutube, cmd, err)
+// 	}
+// 	y.logger.Info(fmt.Sprintf("⏳ Running cmd %s", cmd))
+// 	err = cmd.Start()
+// 	if err != nil {
+// 		errOutput, _ := io.ReadAll(stderr)
+// 		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, errOutput)
+// 	}
+// 	if err := cmd.Wait(); err != nil {
+// 		errOutput, _ := io.ReadAll(stderr)
+// 		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, errOutput)
+// 	}
+// 	y.logger.Info(fmt.Sprintf("✅ Finished Download of %s", y.Url()), "download.time", time.Since(start).String())
+// 	return reader, nil
+// }
+
 func (y *yt) Download(id uuid.UUID, path string) error {
 	start := time.Now()
-	_, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
+
 	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
 	cmd := exec.Command(
 		"yt-dlp",

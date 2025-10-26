@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"tubefeed/internal/config"
-	"tubefeed/internal/db"
 	"tubefeed/internal/downloader"
 	"tubefeed/internal/models"
+	"tubefeed/internal/store"
 	"tubefeed/internal/utils"
 )
 
@@ -23,7 +23,7 @@ type Worker struct {
 	id             int
 	report         chan<- models.Request // report channel to broadcast sse
 	request        <-chan models.Request
-	db             *db.Database
+	store          store.Store
 	path           string
 	reportInterval time.Duration
 	logger         *slog.Logger
@@ -32,7 +32,7 @@ type Worker struct {
 // CreateWorkers starts all configured workers
 func CreateWorkers(
 	count int,
-	db *db.Database,
+	db store.Store,
 	path string,
 	req <-chan models.Request,
 	report chan<- models.Request,
@@ -45,7 +45,7 @@ func CreateWorkers(
 			id:             id,
 			report:         report,
 			request:        req,
-			db:             db,
+			store:          db,
 			path:           path,
 			reportInterval: config.Load().ReportInterval,
 			logger:         logger.With("id", id),
@@ -60,7 +60,7 @@ func (w *Worker) handleError(ctx context.Context, item *models.Request, logger *
 	item.Error = utils.StringToPointer(err.Error())
 	item.Status = models.StatusError
 	logger.ErrorContext(ctx, fmt.Sprintf("Error: %v, Request: %#v", err, item))
-	dberr := w.db.SetStatus(ctx, item.ID, item.Status)
+	dberr := w.store.SetStatus(ctx, item.ID, item.Status)
 	if dberr != nil {
 		logger.ErrorContext(ctx, fmt.Sprintf("Error: %v", dberr))
 	}
@@ -118,13 +118,13 @@ func (w *Worker) start() {
 			}
 			// save meta to db -> StateMeta
 			item.Status = models.StatusMeta
-			err = w.db.SaveItemMetadata(ctx, *item, item.Playlist, models.StatusMeta)
+			err = w.store.SaveItemMetadata(ctx, *item, item.Playlist, models.StatusMeta)
 			if err != nil {
 				return
 			}
 			// download & extract audio -> StateLoading
 			item.Status = models.StatusLoading
-			err = w.db.SetStatus(ctx, item.ID, models.StatusLoading)
+			err = w.store.SetStatus(ctx, item.ID, models.StatusLoading)
 			if err != nil {
 				return
 			}
@@ -135,7 +135,7 @@ func (w *Worker) start() {
 			// complete -> StatusReady
 			item.Status = models.StatusReady
 			item.Done = true
-			err = w.db.SetStatus(ctx, item.ID, models.StatusReady)
+			err = w.store.SetStatus(ctx, item.ID, models.StatusReady)
 			if err != nil {
 				return
 			}

@@ -3,6 +3,7 @@ package downloader
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"tubefeed/internal/models"
 	"tubefeed/internal/provider"
 	"tubefeed/internal/provider/registry"
@@ -39,6 +40,10 @@ func (vm *Source) Download(path string) error {
 			return err
 		}
 		vm.provider = provider
+	}
+	_, err := os.Stat(path)
+	if err != nil {
+		return err
 	}
 	return vm.provider.Download(vm.ID, path)
 }
