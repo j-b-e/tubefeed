@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -23,7 +22,6 @@ type App struct {
 	version     string
 	request     chan models.Request
 	report      chan models.Request
-	requests    []models.Request
 	logger      *slog.Logger
 }
 
@@ -65,11 +63,6 @@ func (a App) Run() (err error) {
 		panic(err)
 	}
 	go a.reportworker(a.logger.WithGroup("reportworker"))
-
-	a.requests, err = a.Store.LoadDatabase(context.Background())
-	if err != nil {
-		panic(err)
-	}
 
 	//gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()

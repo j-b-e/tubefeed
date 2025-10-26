@@ -83,10 +83,12 @@ func (w *Worker) start() {
 				case <-done:
 					wlog.DebugContext(ctx, "Ticker chan Done")
 					ticker.Stop()
+					w.report <- item
 					return
 				case <-ctx.Done():
 					wlog.DebugContext(ctx, fmt.Sprintf("Ticker context Done - %v", ctx.Err()))
 					ticker.Stop()
+					w.report <- item
 					return
 				case <-ticker.C:
 					w.report <- item

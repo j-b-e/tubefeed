@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tubefeed - Podcast RSS</title>
     <script src="static/htmx.min.js"></script>
+    <script src="static/htmx-ext-response-targets.min.js"></script>
     <link rel="icon" type="image/x-icon" href="/static/favicon-32x32.png">
     <link rel="stylesheet" type="text/css" href="/static/styles.css" media="screen" />
 </head>
-<body>
+<body hx-ext="response-targets">
 <h1>Tubefeed</h1>
 
 <div>
@@ -16,7 +17,5 @@
         {{ template "content.html" . }}
     </div>
 </div>
-
-
 </body>
 </html>

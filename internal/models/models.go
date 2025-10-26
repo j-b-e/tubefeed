@@ -12,14 +12,17 @@ const (
 
 type Status string
 
+// Possible statuses for a Request
 var (
-	StatusNew     Status = "New"
-	StatusMeta    Status = "FetchingMeta"
-	StatusLoading Status = "Downloading"
-	StatusReady   Status = "Available"
-	StatusError   Status = "Error"
+	StatusNew       Status = "New"
+	StatusMeta      Status = "FetchingMeta"
+	StatusLoading   Status = "Downloading"
+	StatusReady     Status = "Available"
+	StatusError     Status = "Error"
+	StatusDuplicate Status = "Duplicate"
 )
 
+// Request represents a media download request
 type Request struct {
 	ID       uuid.UUID
 	Title    string

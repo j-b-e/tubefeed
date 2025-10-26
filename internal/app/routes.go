@@ -25,9 +25,14 @@ var (
 
 // GET /
 func (a App) getRootHandler(c *gin.Context) {
+	requests, err := a.Store.LoadDatabase(c.Request.Context())
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"playlist": nil,
-		"audio":    a.requests,
+		"Items":    requests,
 	})
 }
 
@@ -35,29 +40,38 @@ func (a App) getRootHandler(c *gin.Context) {
 func (a App) newRequestHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger := a.logger.With("handler", "newRequest")
-	videoURL := c.PostForm("media_url")
-	if videoURL == "" {
+	itemURL := c.PostForm("media_url")
+	if itemURL == "" {
 		err := fmt.Errorf("no url provided")
 		logger.ErrorContext(ctx, err.Error())
-		c.AbortWithStatusJSON(http.StatusBadRequest, err)
+
+		c.Header("HX-Retarget", "#popup-container")
+		c.Header("HX-Reswap", "beforeend")
+		c.HTML(http.StatusBadRequest, "error-popup.html", gin.H{
+			"title": "Error", "message": "No url provided", "item": "",
+		})
 		return
 	}
 
-	duplicate, err := a.Store.CheckforDuplicate(ctx, videoURL, uuid.MustParse(models.Default_playlist))
+	duplicate, err := a.Store.CheckforDuplicate(ctx, itemURL, uuid.MustParse(models.Default_playlist))
 	if err != nil {
 		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
 	if duplicate {
-		c.JSON(http.StatusConflict, gin.H{"conflict": "Audio already present"})
+		c.Header("HX-Retarget", "#popup-container")
+		c.Header("HX-Reswap", "beforeend")
+		c.HTML(http.StatusConflict, "error-popup.html", gin.H{
+			"title": "Conflict", "message": "Media already present",
+		})
 		return
 	}
 
 	// send request to worker
 	request := models.Request{
 		ID:       uuid.New(),
-		URL:      videoURL,
+		URL:      itemURL,
 		Playlist: uuid.MustParse(models.Default_playlist),
 		Progress: 0,
 		Done:     false,
@@ -71,7 +85,12 @@ func (a App) newRequestHandler(c *gin.Context) {
 		c.Status(http.StatusAccepted)
 		return
 	default:
-		c.AbortWithStatusJSON(http.StatusTooManyRequests, `{"error": "too many requests"`)
+		c.Header("HX-Retarget", "#popup-container")
+		c.Header("HX-Reswap", "beforeend")
+		c.HTML(http.StatusTooManyRequests, "error-popup.html", gin.H{
+			"title": "Error", "message": "Too many requests, please try again later", "item": itemURL,
+		})
+
 	}
 }
 

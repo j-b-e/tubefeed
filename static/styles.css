@@ -8,27 +8,6 @@ body {
     margin: 20px;
 }
 
-.tabs {
-    display: flex;
-    cursor: pointer;
-    align-items: center;
-}
-
-.tab {
-    padding: 10px 20px;
-    border: 1px solid #ccc;
-    border-bottom: none;
-    margin-right: 10px;
-    background-color: #f1f1f1;
-    display: flex;
-    align-items: center;
-}
-
-.tab.active {
-    background-color: #ffffff;
-    border-bottom: 1px solid white;
-}
-
 .plus-button {
     padding: 10px 20px;
     background-color: #28a745;
@@ -147,4 +126,22 @@ body {
     /* Fixed width for Name column */
     word-wrap: break-word;
     /* Ensures long words break into new lines */
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.animate-fade-out {
+    animation: fadeOut 0.3s ease-out;
 }

@@ -55,8 +55,12 @@ func (m *memory) GetPlaylistName(_ context.Context, id uuid.UUID) (string, error
 	return "", fmt.Errorf("playlist not found")
 }
 
-func (m *memory) CheckforDuplicate(_ context.Context, url string, playlist uuid.UUID) (bool, error) {
-	// TODO
+func (m *memory) CheckforDuplicate(_ context.Context, url string, _ uuid.UUID) (bool, error) {
+	for _, item := range m.items {
+		if item.URL == url {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 

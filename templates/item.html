@@ -1,19 +1,12 @@
-{{ $pending := "true" }}
-{{ if or (eq .Status "Available") (eq .Status "Error") }}
-{{ $pending = "false" }}
-{{ end }}
-
 <tr id="audio-{{ .ID }}">
     <td>
-    {{ if eq $pending "false" }}
         <audio controls>
         <source src="/audio/{{ .ID }}" type="audio/mpeg">
         Your browser does not support the audio element.
       </audio>
-    {{ end }}
     </td>
     <td class="name-column">
-        {{ .Meta.Channel }} - {{ .Meta.Title }}
+        {{ .Channel }} - {{ .Title }}
     </td>
     <td>
         <div class="info-icon">
@@ -23,8 +16,8 @@
             </div>
         </div>
         <div class="info-icon">
-            <a href="{{ .Meta.URL }}" target="_blank">▶️</a>
-            <div class="info-window">{{ .Meta.URL }}</div>
+            <a href="{{ .URL }}" target="_blank">▶️</a>
+            <div class="info-window">{{ .URL }}</div>
         </div>
     </td>
     <td>
