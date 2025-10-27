@@ -1,57 +1,73 @@
--- name: SaveMetadata :exec
-INSERT OR REPLACE INTO audio (
-  id, title, channel, length, size, source_url, status, provider_id, playlist_id, updated_at
-) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-);
-
--- name: AddPlaylist :exec
+-- name: CreatePlaylist :exec
 INSERT OR REPLACE INTO playlist (
   id, name
 ) VALUES (
   ?, ?
 );
 
--- name: LoadDatabase :many
-SELECT id, title, channel, status, length, source_url, playlist_id
-FROM audio;
+-- name: UpdatePlaylist :exec
+UPDATE playlist
+SET name = ?
+WHERE id = ?;
 
--- name: LoadAudioFromPlaylist :many
-SELECT id, title, channel, status, length, source_url
-FROM audio
-WHERE playlist_id = ?;
+-- name: DeletePlaylist :exec
+DELETE FROM playlist
+WHERE id = (?);
 
--- name: LoadPlaylist :one
-SELECT id, name
+-- name: ListPlaylist :many
+SELECT *
+FROM playlist
+ORDER BY id;
+
+-- name: GetPlaylist :one
+SELECT *
 FROM playlist
 WHERE id = ?;
 
--- name: GetAudio :one
-SELECT title, channel, status, playlist_id, playlist.name as playlist_name, length, source_url
-FROM audio
-JOIN playlist ON audio.playlist_id = playlist.id
-WHERE audio.id = ?
-LIMIT 1;
+-- name: CountPlaylist :one
+SELECT count(*)
+FROM playlist;
+
+-- name: CreateAudio :exec
+INSERT OR REPLACE INTO audio (
+  id, title, channel, length, size, source_url, status, provider_id, playlist_id, updated_at
+) VALUES (
+  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+);
 
 -- name: DeleteAudio :exec
 DELETE FROM audio
 WHERE id = ?;
 
--- name: DeleteAudioFromPlaylist :exec
-DELETE FROM audio
+-- name: UpdateAudio :exec
+UPDATE audio
+SET
+   title = ?, channel = ?, length = ?,
+   size = ?, source_url = ?, status = ?,
+   provider_id = ?, playlist_id = ?, updated_at = ?
+WHERE id = ?;
+
+-- name: ListAudio :many
+SELECT *
+FROM audio;
+
+-- name: LoadAudioByPlaylist :many
+SELECT *
+FROM audio
 WHERE playlist_id = ?;
+
+-- name: GetAudio :one
+SELECT *, playlist.name as playlist_name
+FROM audio
+JOIN playlist ON audio.playlist_id = playlist.id
+WHERE audio.id = ?
+LIMIT 1;
+
+-- name: CountAudio :one
+SELECT count(*)
+FROM audio;
 
 -- name: CountDuplicate :one
 SELECT count(*)
 FROM audio
 WHERE source_url = ? AND playlist_id = ?;
-
--- name: SetStatus :exec
-UPDATE audio
-SET status = ?
-WHERE id = ?;
-
--- name: GetStatus :exec
-SELECT status
-FROM audio
-WHERE id = ?;

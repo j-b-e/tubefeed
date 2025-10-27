@@ -38,7 +38,7 @@ func (a App) getRootHandler(c *gin.Context) {
 }
 
 // POST /audio
-func (a App) newRequestHandler(c *gin.Context) {
+func (a App) createAudioHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger := a.logger.With("handler", "newRequest")
 	itemURL := c.PostForm("media_url")
@@ -76,8 +76,14 @@ func (a App) newRequestHandler(c *gin.Context) {
 	}
 
 	// send request to worker
+	uuidv7, err := uuid.NewV7()
+	if err != nil {
+		logger.Error(err.Error())
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
 	request := models.Request{
-		ID:        uuid.New(),
+		ID:        uuidv7,
 		SourceURL: itemURL,
 		Playlist:  uuid.MustParse(models.Default_playlist_id),
 		Progress:  0,

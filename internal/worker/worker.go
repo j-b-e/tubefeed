@@ -61,7 +61,7 @@ func (w *Worker) handleError(ctx context.Context, item *models.Request, logger *
 	item.Error = utils.StringToPointer(err.Error())
 	item.Status = models.StatusError
 	logger.ErrorContext(ctx, fmt.Sprintf("Error: %v, Request: %#v", err, item))
-	err = w.store.SaveItemMetadata(ctx, *item)
+	err = w.store.UpdateItem(ctx, *item)
 	if err != nil {
 		logger.ErrorContext(ctx, fmt.Sprintf("Error: %v", err))
 	}
@@ -76,7 +76,7 @@ func (w *Worker) start(bctx context.Context) {
 		wlog := w.logger.With("item", item.ID)
 		ticker := time.NewTicker(w.reportInterval)
 		done := make(chan struct{})
-		// 1. Ticker to report progress
+		// 1. Ticker to report progress through SSE
 		go func() {
 			for {
 				select {
@@ -103,7 +103,7 @@ func (w *Worker) start(bctx context.Context) {
 				close(done)
 				cancel()
 				if err != nil {
-					w.handleError(bctx, item, wlog, err) // use bctx to handle err outside of worker context
+					w.handleError(bctx, item, wlog, err) // use bctx to handle err outside of request context
 				}
 			}()
 
@@ -120,13 +120,13 @@ func (w *Worker) start(bctx context.Context) {
 			}
 			// save meta to db -> StateMeta
 			item.Status = models.StatusMeta
-			err = w.store.SaveItemMetadata(ctx, *item)
+			err = w.store.UpdateItem(ctx, *item)
 			if err != nil {
 				return
 			}
 			// download & extract audio -> StateLoading
 			item.Status = models.StatusLoading
-			err = w.store.SaveItemMetadata(ctx, *item)
+			err = w.store.UpdateItem(ctx, *item)
 			if err != nil {
 				return
 			}
@@ -138,7 +138,7 @@ func (w *Worker) start(bctx context.Context) {
 			item.Status = models.StatusReady
 			item.Done = true
 			item.StreamURL = utils.GenerateStreamURL(item.ID)
-			err = w.store.SaveItemMetadata(ctx, *item)
+			err = w.store.UpdateItem(ctx, *item)
 			if err != nil {
 				return
 			}

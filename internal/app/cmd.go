@@ -74,7 +74,7 @@ func (a App) Run() (err error) {
 
 	api := r.Group("/api/v1")
 	api.GET("/", a.apiGetRootHandler)
-	api.POST("/audio", a.newRequestHandler)
+	api.POST("/audio", a.createAudioHandler)
 	api.GET("/audio/:id", a.streamAudio)
 
 	r.LoadHTMLGlob("templates/*")
@@ -84,7 +84,7 @@ func (a App) Run() (err error) {
 	r.GET("/", a.getRootHandler)
 
 	// Add a new item
-	r.POST("/audio", a.newRequestHandler)
+	r.POST("/audio", a.createAudioHandler)
 	// Stream or download audio route
 	r.GET("/audio/:id", a.streamAudio)
 	// Route to delete an item by ID

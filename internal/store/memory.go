@@ -74,7 +74,7 @@ func (m *memory) SetStatus(_ context.Context, id uuid.UUID, status models.Status
 
 }
 
-func (m *memory) SaveItemMetadata(_ context.Context, item models.Request) error {
+func (m *memory) UpdateItem(_ context.Context, item models.Request) error {
 	m.items[item.ID] = &item
 	return nil
 }

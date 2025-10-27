@@ -50,9 +50,12 @@ func NewSqliteDb(path string) (Store, error) {
 		queries: sqlc.New(conn),
 		conn:    conn,
 	}
-	err = db.queries.WithTx(tx).AddPlaylist(
+	err = db.queries.WithTx(tx).CreatePlaylist(
 		ctx,
-		sqlc.AddPlaylistParams{ID: uuid.MustParse(models.Default_playlist_id), Name: models.Default_playlist_name},
+		sqlc.CreatePlaylistParams{
+			ID:   uuid.MustParse(models.Default_playlist_id),
+			Name: models.Default_playlist_name,
+		},
 	)
 	if err != nil {
 		return nil, dbErr(err)
@@ -71,7 +74,7 @@ func (db *Database) Close() error {
 
 // LoadDatabase loads all items from the database
 func (db *Database) LoadDatabase(ctx context.Context) (items []models.Request, err error) {
-	rows, err := db.queries.LoadDatabase(ctx)
+	rows, err := db.queries.ListAudio(ctx)
 	if err != nil {
 		return nil, dbErr(err)
 	}
@@ -93,7 +96,7 @@ func (db *Database) LoadDatabase(ctx context.Context) (items []models.Request, e
 
 // LoadFromPlaylist loads all items from a specific playlist
 func (db *Database) LoadFromPlaylist(ctx context.Context, playlist uuid.UUID) ([]models.Request, error) {
-	rows, err := db.queries.LoadAudioFromPlaylist(ctx, playlist)
+	rows, err := db.queries.LoadAudioByPlaylist(ctx, playlist)
 	if err != nil {
 		return nil, dbErr(err)
 	}
@@ -118,7 +121,7 @@ func (db *Database) LoadFromPlaylist(ctx context.Context, playlist uuid.UUID) ([
 
 // GetPlaylistName retrieves the name of a playlist by its ID
 func (db *Database) GetPlaylistName(ctx context.Context, id uuid.UUID) (string, error) {
-	playlist, err := db.queries.LoadPlaylist(ctx, id)
+	playlist, err := db.queries.GetPlaylist(ctx, id)
 	if err != nil {
 		return "", dbErr(err)
 	}
@@ -148,14 +151,14 @@ func (db *Database) GetItem(ctx context.Context, id uuid.UUID) (models.Request, 
 	return item, nil
 }
 
-// SaveItemMetadata writes item metadata to the database
-func (db *Database) SaveItemMetadata(
+// UpdateItem writes item metadata to the database
+func (db *Database) UpdateItem(
 	ctx context.Context,
 	item models.Request,
 ) error {
-	err := db.queries.SaveMetadata(
+	err := db.queries.UpdateAudio(
 		ctx,
-		sqlc.SaveMetadataParams{
+		sqlc.UpdateAudioParams{
 			ID:         item.ID,
 			Title:      item.Title,
 			Channel:    item.Channel,
