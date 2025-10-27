@@ -19,7 +19,7 @@ func (a App) getRSSHandler(c *gin.Context) {
 		return
 	}
 
-	playlistName, err := a.Store.GetPlaylistName(ctx, playlistID)
+	playlistName, err := a.Store.GetPlaylist(ctx, playlistID)
 	if err != nil {
 		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)

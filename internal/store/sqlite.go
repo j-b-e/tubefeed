@@ -201,3 +201,47 @@ func (db *Database) DeleteItem(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+// CreatePlaylist adds a new playlist to the database
+func (db *Database) CreatePlaylist(ctx context.Context, id uuid.UUID, name string) error {
+	err := db.queries.CreatePlaylist(ctx, sqlc.CreatePlaylistParams{ID: id, Name: name})
+	if err != nil {
+		return dbErr(err)
+	}
+	return nil
+}
+
+// GetPlaylist retrieves a playlist name by its ID
+func (db *Database) GetPlaylist(ctx context.Context, id uuid.UUID) (string, error) {
+	playlist, err := db.queries.GetPlaylist(ctx, id)
+	if err != nil {
+		return "", dbErr(err)
+	}
+	return playlist.Name, nil
+}
+
+// DeletePlaylist removes a playlist from the database
+func (db *Database) DeletePlaylist(ctx context.Context, id uuid.UUID) error {
+	err := db.queries.DeletePlaylist(ctx, id)
+	if err != nil {
+		return dbErr(err)
+	}
+	return nil
+}
+
+// UpdatePlaylist updates the name of a playlist
+func (db *Database) UpdatePlaylist(ctx context.Context, id uuid.UUID, name string) error {
+	err := db.queries.UpdatePlaylist(ctx, sqlc.UpdatePlaylistParams{
+		ID:   id,
+		Name: name,
+	})
+	if err != nil {
+		return dbErr(err)
+	}
+	return nil
+}
+
+// ListPlaylist returns all playlists from the database
+func (db *Database) ListPlaylist(context.Context) ([]models.Playlist, error) {
+	panic("not implemented") // TODO: Implement
+}

@@ -38,3 +38,11 @@ type Request struct {
 	Status    Status        `json:"status"`
 	StreamURL string        `json:"stream_url,omitempty"`
 }
+
+// Playlist for collecting audio into lists
+type Playlist struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

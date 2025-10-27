@@ -11,6 +11,7 @@ import (
 	"tubefeed/internal/rss"
 	"tubefeed/internal/store"
 	"tubefeed/internal/worker"
+	"tubefeed/templates"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,6 +39,49 @@ func Setup(version string) App {
 		version: version,
 		checkMu: new(sync.Mutex),
 	}
+}
+
+// Init initializes the Gin engine and routes
+func (a App) Init() *gin.Engine {
+	//gin.SetMode(gin.ReleaseMode)
+	r := gin.Default()
+
+	api := r.Group("/api/v1")
+	api.GET("/", a.apiGetRootHandler)
+	api.POST("/audio", a.createAudioHandler)
+	api.GET("/audio/:id", a.streamAudio)
+
+	r.LoadHTMLFS(http.FS(templates.FS), "*")
+
+	r.Static("/static", "./static")
+
+	r.GET("/", a.getRootHandler)
+
+	// Add a new item
+	r.POST("/audio", a.createAudioHandler)
+	// Stream or download audio route
+	r.GET("/audio/:id", a.streamAudio)
+	// Route to delete an item by ID
+	r.DELETE("/audio/:id", a.deleteAudioHandler)
+	//r.PATCH("/audio/:id", a.patchAudioHandler)
+
+	// Playlists
+	r.POST("/playlist", a.createPlaylistHandler)
+	r.GET("/playlist", a.listPlaylistHandler)
+	r.GET("/playlist/:id", a.getPlaylistHandler)
+	r.DELETE("/playlist/:id", a.deletePlaylistHandler)
+	r.PATCH("/playlist/:id", a.updatePlaylistHandler)
+
+	r.GET("/rss/:id", a.getRSSHandler)
+
+	r.GET("/version", func(c *gin.Context) {
+		json := []byte(`{"version": "` + a.version + `" }`)
+		c.Data(http.StatusOK, gin.MIMEJSON, json)
+	})
+
+	// SSE Endpoint
+	r.GET("/events", a.eventsHandler)
+	return r
 }
 
 // Run main app
@@ -69,44 +113,6 @@ func (a App) Run() (err error) {
 	}
 	go a.reportworker(a.logger.WithGroup("reportworker"))
 
-	//gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
-
-	api := r.Group("/api/v1")
-	api.GET("/", a.apiGetRootHandler)
-	api.POST("/audio", a.createAudioHandler)
-	api.GET("/audio/:id", a.streamAudio)
-
-	r.LoadHTMLGlob("templates/*")
-
-	r.Static("/static", "./static")
-
-	r.GET("/", a.getRootHandler)
-
-	// Add a new item
-	r.POST("/audio", a.createAudioHandler)
-	// Stream or download audio route
-	r.GET("/audio/:id", a.streamAudio)
-	// Route to delete an item by ID
-	r.DELETE("/audio/:id", a.deleteAudioHandler)
-	//r.PATCH("/audio/:id", a.patchAudioHandler)
-
-	// Playlists
-	// r.POST("/playlist", a.createPlaylistHandler)
-	// r.GET("/playlist/:id", a.getPlaylistHandler)
-	// Route to delete an item by ID
-	// r.DELETE("/playlist/:id", a.deletePlaylistHandler)
-	// r.PATCH("/playlist/:id", a.patchPlaylistHandler)
-
-	r.GET("/rss/:id", a.getRSSHandler)
-
-	r.GET("/version", func(c *gin.Context) {
-		json := []byte(`{"version": "` + a.version + `" }`)
-		c.Data(http.StatusOK, gin.MIMEJSON, json)
-	})
-
-	// SSE Endpoint
-	r.GET("/events", a.eventsHandler)
-
+	r := a.Init()
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
 }
