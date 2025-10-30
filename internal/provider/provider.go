@@ -19,11 +19,26 @@ type SourceProvider interface {
 }
 
 type SourceMeta struct {
-	ID          uuid.UUID // for later when id is removed from Download() signature
-	ProviderID  string    // Provider Internal ID
-	Title       string
-	Channel     string
-	Length      time.Duration
-	Description string
-	URL         string
+	ID           uuid.UUID // for later when id is removed from Download() signature
+	ProviderID   string    // Provider Internal ID
+	Title        string
+	Channel      string
+	Length       time.Duration
+	Description  string
+	URL          string
+	ThumbnailURL string
+}
+
+var registry = make(map[string]ProviderNewSourceFn)
+
+// Register provider for a domain
+func Register(domain string, p ProviderNewSourceFn) {
+	registry[domain] = p
+}
+
+func Get(name string) ProviderNewSourceFn {
+	if fn, ok := registry[name]; ok {
+		return fn
+	}
+	return nil
 }

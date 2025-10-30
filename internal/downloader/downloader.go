@@ -7,8 +7,9 @@ import (
 	"os"
 	"tubefeed/internal/models"
 	"tubefeed/internal/provider"
-	"tubefeed/internal/provider/registry"
 	"tubefeed/internal/utils"
+
+	_ "tubefeed/internal/provider/yt" // load yt provider
 
 	"github.com/google/uuid"
 )
@@ -32,7 +33,7 @@ func (vm *Source) Download(ctx context.Context, path string) error {
 		if err != nil {
 			return err
 		}
-		new := registry.Get(domain)
+		new := provider.Get(domain)
 		if new == nil {
 			return fmt.Errorf("failed to Download")
 		}
@@ -55,7 +56,7 @@ func NewSource(id uuid.UUID, url string, logger *slog.Logger) (Source, error) {
 	if err != nil {
 		return Source{}, err
 	}
-	newprovider := registry.Get(domain)
+	newprovider := provider.Get(domain)
 	if newprovider == nil {
 		return Source{}, fmt.Errorf("domain not supported: %s", domain)
 	}

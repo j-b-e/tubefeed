@@ -16,7 +16,6 @@ type Config struct {
 	ReportInterval time.Duration
 	LogLevel       string
 	DBPath         string
-	//Store          store.Store
 }
 
 var config *Config

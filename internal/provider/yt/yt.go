@@ -23,8 +23,13 @@ var (
 	ErrYoutube = errors.New("youtube error")
 )
 
-// New implements ProviderNewVideoFn
-func New(url string, logger *slog.Logger) (provider.SourceProvider, error) {
+func init() {
+	provider.Register("youtube.com", newytprovider)
+	provider.Register("youtu.be", newytprovider)
+}
+
+// newytprovider implements ProviderNewVideoFn
+func newytprovider(url string, logger *slog.Logger) (provider.SourceProvider, error) {
 	if !strings.Contains(url, "youtube.com") && !strings.Contains(url, "youtu.be") {
 		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
 	}
@@ -127,11 +132,12 @@ func (y *yt) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) {
 		return nil, fmt.Errorf("%w: video id from result didnt match", ErrYoutube)
 	}
 	meta := provider.SourceMeta{
-		ProviderID: y.ytid,
-		Title:      result["title"].(string),
-		Channel:    result["uploader"].(string),
-		Length:     time.Duration(int(result["duration"].(float64))) * time.Second,
-		URL:        y.Url(),
+		ProviderID:  y.ytid,
+		Title:       result["title"].(string),
+		Channel:     result["uploader"].(string),
+		Length:      time.Duration(int(result["duration"].(float64))) * time.Second,
+		URL:         y.Url(),
+		Description: result["description"].(string),
 	}
 	return &meta, nil
 }
