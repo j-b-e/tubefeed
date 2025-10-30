@@ -32,8 +32,8 @@ type App struct {
 // Setup initializes the app with the given version
 func Setup(version string) App {
 	c := config.Load()
-
 	return App{
+		logger:  createLogger(),
 		config:  c,
 		rss:     rss.NewRSS(c.ExternalURL),
 		version: version,
@@ -87,7 +87,17 @@ func (a App) Init() *gin.Engine {
 // Run main app
 func (a App) Run() (err error) {
 	ctx := context.Background()
-	a.Store = a.config.Store
+	if a.config.DBPath == "memory" {
+		a.Store = store.NewMemoryStore()
+		a.logger.Warn("DEV -- Memory only Store used --- DEV")
+	} else {
+		a.Store, err = store.NewSqliteDb(a.config.DBPath)
+		if err != nil {
+			panic(err)
+		}
+		a.logger.Info("Sqlite db initalized", "path", a.config.DBPath)
+	}
+
 	defer func() {
 		err = a.Store.Close()
 		if err != nil {
@@ -95,7 +105,6 @@ func (a App) Run() (err error) {
 		}
 	}()
 
-	a.logger = a.createLogger()
 	a.request = make(chan models.Request)
 	a.report = make(chan models.Request)
 	defer close(a.request)

@@ -1,7 +1,9 @@
+.PHONY: generate
 generate:
 	@go generate ./...
 
-build:
+.PHONY: build
+build: sqlc generate
 	 @go build main.go
 
 clean:
@@ -21,7 +23,7 @@ sqlc:
 	@go run github.com/sqlc-dev/sqlc/cmd/sqlc compile
 
 air:
-	@air
+	@env DATABASE_PATH=memory air
 
 update-htmx-dep:
 	@curl -fsSL "https://cdn.jsdelivr.net/npm/htmx.org/dist/htmx.min.js" -o static/htmx.min.js

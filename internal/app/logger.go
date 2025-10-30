@@ -7,7 +7,7 @@ import (
 	"tubefeed/internal/config"
 )
 
-func (a App) createLogger() *slog.Logger {
+func createLogger() *slog.Logger {
 	var level slog.Level
 	switch config.Load().LogLevel {
 	case "debug":

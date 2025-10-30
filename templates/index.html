@@ -1,22 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Convert YouTube videos to podcast RSS feeds">
+    <meta name="theme-color" content="#6366f1"><!--TODO-->
+    <meta name="robots" content="noindex">
     <title>Tubefeed - Podcast RSS</title>
     <script src="static/htmx.min.js"></script>
     <script src="static/htmx-ext-response-targets.min.js"></script>
     <link rel="icon" type="image/x-icon" href="/static/favicon-32x32.png">
     <link rel="stylesheet" type="text/css" href="/static/styles.css" media="screen" />
 </head>
-<body hx-ext="response-targets">
-<h1>Tubefeed</h1>
 
-<div id="popup-container"></div>
-<div>
-    <div id="content" class="content">
-        {{ template "content.html" . }}
-    </div>
-</div>
+<body hx-ext="response-targets">
+    <header>
+        <h1>Tubefeed</h1>
+        <p>Podcast RSS feed generator</p>
+    </header>
+    <div id="popup-container"></div>
+    <main>
+        <div id="content" class="content">
+            {{ template "content.html" . }}
+        </div>
+    </main>
+    <noscript>
+        <p>This application requires JavaScript to work.</p>
+    </noscript>
 </body>
+
 </html>

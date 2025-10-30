@@ -29,7 +29,7 @@ type Database struct {
 
 // NewSqliteDb initializes the database at the given path
 func NewSqliteDb(path string) (Store, error) {
-	conn, err := sql.Open("sqlite3", path)
+	conn, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, dbErr(err)
 	}

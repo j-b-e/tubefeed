@@ -1,29 +1,32 @@
 <tr id="audio-{{ .ID }}">
     <td>
         <audio controls>
-        <source src="/audio/{{ .ID }}" type="audio/mpeg">
-        Your browser does not support the audio element.
-      </audio>
+            <source src="/audio/{{ .ID }}" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
     </td>
     <td class="name-column">
         {{ .Channel }} - {{ .Title }}
     </td>
     <td>
         <div class="info-icon">
-            ℹ️
+            <span aria-label="Info">ℹ️</span>
             <div class="info-window">
                 {{ .ID }}
             </div>
         </div>
         <div class="info-icon">
-            <a href="{{ .SourceURL }}" target="_blank">▶️</a>
+            <a href="{{ .SourceURL }}" target="_blank"><span aria-label="Open video source">▶️</span></a>
             <div class="info-window">{{ .SourceURL }}</div>
         </div>
     </td>
     <td>
-        {{ .Status }}
+        <span class="status-text">
+            {{ .Status }}
+        </span>
     </td>
     <td>
-        <button class="delete-button" hx-delete="/audio/{{ .ID }}" hx-target="#audio-{{ .ID }}" hx-swap="outerHTML swap:1s">Delete</button>
+        <button class="delete-button" hx-delete="/audio/{{ .ID }}" hx-target="#audio-{{ .ID }}"
+            hx-swap="outerHTML swap:1s">Delete</button>
     </td>
 </tr>

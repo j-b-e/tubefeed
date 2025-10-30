@@ -1,138 +1,198 @@
-tr.htmx-swapping td {
-    opacity: 0;
-    transition: opacity 1s ease-out;
-}
-
 body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
+    margin: 0;
+    font-family: "Segoe UI", Roboto, sans-serif;
+    background-color: #f9fafb;
+    color: #111827;
+    line-height: 1.5;
 }
 
-.plus-button {
-    padding: 10px 20px;
-    background-color: #28a745;
+header {
+    background-color: #6366f1;
     color: white;
-    cursor: pointer;
+    padding: 1rem 2rem;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+header p {
+    margin: 0.25rem 0 0;
+    font-weight: 400;
+}
+
+/* Main content container */
+#content {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+/* Links */
+a {
+    color: #4f46e5;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Form */
+form fieldset {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    background-color: #ffffff;
+}
+
+form legend {
+    font-weight: 600;
+}
+
+form label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+form input[type="url"] {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+}
+
+form button {
+    background-color: #6366f1;
+    color: white;
     border: none;
-    font-size: 18px;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
 }
 
-.content {
-    padding: 20px;
-    border: 1px solid #ccc;
+form button:hover {
+    background-color: #4f46e5;
 }
 
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 2rem;
+    background-color: #ffffff;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+th, td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+}
+
+th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+}
+
+tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+.name-column {
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+/* Audio player */
+audio {
+    width: 100%;
+}
+
+/* Delete buttons */
 .delete-button {
+    background-color: #ef4444;
     color: white;
-    background-color: #dc3545;
     border: none;
-    padding: 5px 10px;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
     cursor: pointer;
+    font-weight: 500;
 }
 
-/* Style for the info icon */
+.delete-button:hover {
+    background-color: #dc2626;
+}
+
+/* Info icons */
 .info-icon {
-    cursor: pointer;
+    display: inline-block;
     position: relative;
+    margin-right: 0.5rem;
+    cursor: pointer;
 }
 
-/* Style for the floating info window */
-.info-window {
+.info-icon .info-window {
     display: none;
     position: absolute;
-    background-color: #fff;
-    border: 1px solid #ccc;
-    padding: 10px;
-    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
-    width: 200px;
+    top: 1.5rem;
+    left: 0;
+    background-color: #111827;
+    color: white;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 4px;
+    white-space: nowrap;
     z-index: 10;
-    top: 20px;
-    left: -10px;
 }
 
-/* Show the info window when hovering over the icon */
 .info-icon:hover .info-window {
     display: block;
 }
 
-/* Fixed width for the name column */
-.name-column {
-    width: 200px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    position: relative;
+/* Event list */
+#items details.item {
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
 }
 
-.name-column:hover .full-name-window {
-    display: block;
-}
-
-/* Floating window for the full name */
-.full-name-window {
-    display: none;
-    position: absolute;
-    background-color: #fff;
-    border: 1px solid #ccc;
-    padding: 10px;
-    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
-    z-index: 10;
-    top: 20px;
-    left: 0;
-    width: max-content;
-    max-width: 300px;
-}
-
-.delete-button {
-    color: white;
-    background-color: #dc3545;
-    border: none;
-    padding: 5px 10px;
+#items details summary {
     cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
 }
 
-.edit-button {
-    margin-left: 10px;
-    /* Spacing between the tab name and the edit button */
-    background-color: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    color: #007bff;
-    /* Blue color for the edit button */
-    /*visibility: hidden; /* Hidden by default, shown on hover */
-    /*position: absolute;*/
-    right: 5px;
-    /* Position the edit button to the right of the tab */
+#items details .title,
+#items details .source {
+    display: inline-block;
+    word-break: break-word;
 }
 
-.ok-button,
-.cancel-button {
-    /*margin-left: 5px;*/
-    border: none;
-    /*padding: 3px 8px;*/
-    background-color: white;
-    color: white;
-    cursor: pointer;
-    font-size: 12px;
+#items details div {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #374151;
 }
 
-.cancel-button {
-    /*background-color: #dc3545; /* Red for cancel */
-}
 
-.name-column {
-    width: 50%;
-    /* Fixed width for Name column */
-    word-wrap: break-word;
-    /* Ensures long words break into new lines */
-}
 
 .info-popup {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #33be38;
+    background: #2f8b32;
     color: white;
     padding: 16px 20px;
     border-radius: 4px;
@@ -192,4 +252,11 @@ body {
 
 #popup-container > * {
     pointer-events: auto;
+}
+
+.empty-state-message {
+  display: none; /* Hidden by default */
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
 }
