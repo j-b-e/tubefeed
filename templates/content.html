@@ -1,8 +1,10 @@
-<p>Copy this link into your Podcast App: <a href="./rss/{{ .playlist_id }}">RSS-Feed</a></p>
+<p>Copy this link into your Podcast App: <a id="rsslink" href="./rss/{{ .playlist_id }}">RSS-Feed</a>
+    <button class="copy-btn" id="copy-btn" aria-label="Copy link">📋</button>
+</p>
 <form hx-post="/audio" hx-target="#audio-list" hx-target-error="#popup-container">
     <fieldset>
         <legend>Add Media</legend>
-        <label for="media_url">URL</label>
+        <label for="media_url">URL from youtube or archive.org</label>
         <input type="url" id="media_url" name="media_url" placeholder="https://www.youtube.com/watch?v=rMqfD2vInLo"
             required>
         <button type="submit" hx-indicator="#indicator">Add Media</button>
@@ -14,8 +16,13 @@
     {{ template "itemlist.html" . }}
 </div>
 
-<h2>Events</h2>
-<ul id="items"></ul>
+<details>
+    <summary>
+        <strong>Events</strong>
+    </summary>
+
+    <ul id="items"></ul>
+</details>
 
 <script>
     const evtSource = new EventSource("/events");
@@ -61,4 +68,15 @@
             }
         }
     };
+
+    const btn = document.getElementById('copy-btn');
+    btn.addEventListener('click', () => {
+        const url = document.getElementById('rsslink').href;
+        navigator.clipboard.writeText(url).then(() => {
+            console.log('copied');
+            btn.classList.add('copied');
+            setTimeout(() => btn.classList.remove('copied'), 300);
+        }).catch(console.error);
+    });
+
 </script>

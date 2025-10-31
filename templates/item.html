@@ -16,8 +16,12 @@
             </div>
         </div>
         <div class="info-icon">
-            <a href="{{ .SourceURL }}" target="_blank"><span aria-label="Open video source">▶️</span></a>
+            <a href="{{ .SourceURL }}" target="_blank"><span aria-label="Go to source">▶️</span></a>
             <div class="info-window">{{ .SourceURL }}</div>
+        </div>
+        <div class="info-icon">
+            <a href="/audio/{{ .ID }}?download"><span aria-label="Download">💾</span></a>
+            <div class="info-window">Download</div>
         </div>
     </td>
     <td>

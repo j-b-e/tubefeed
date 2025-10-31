@@ -9,7 +9,7 @@ import (
 	"tubefeed/internal/provider"
 	"tubefeed/internal/utils"
 
-	_ "tubefeed/internal/provider/yt" // load yt provider
+	_ "tubefeed/internal/provider/ytdlp" // load ytdlp provider
 
 	"github.com/google/uuid"
 )

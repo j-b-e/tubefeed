@@ -1,8 +1,8 @@
-package yt
+package ytdlp
 
 import "testing"
 
-func Test_extractVideoID(t *testing.T) {
+func Test_extractYTVideoID(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
@@ -73,7 +73,7 @@ func Test_extractVideoID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := extractVideoID(tt.url)
+			got, gotErr := extractYTVideoID(tt.url)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("extractVideoID() failed: %v", gotErr)

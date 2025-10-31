@@ -18,21 +18,20 @@ func (a App) getRSSHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
-
-	playlistName, err := a.Store.GetPlaylist(ctx, playlistID)
-	if err != nil {
-		logger.Error(err.Error())
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
 	audio, err := a.Store.LoadFromPlaylist(ctx, playlistID)
 	if err != nil {
 		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+	playlistName, err := a.Store.GetPlaylist(ctx, playlistID)
+	if err != nil {
+		logger.Error(err.Error())
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
 	// Generate Podcast RSS feed with the video metadata
-	rssfeed, err := a.rss.GeneratePodcastFeed(audio, playlistID, playlistName)
+	rssfeed, err := a.rss.GeneratePodcastFeed(audio, playlistName, playlistName)
 	if err != nil {
 		logger.Error(err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)

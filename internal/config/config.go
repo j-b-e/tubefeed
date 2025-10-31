@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -14,7 +13,6 @@ type Config struct {
 	ExternalURL    string
 	Workers        int
 	ReportInterval time.Duration
-	LogLevel       string
 	DBPath         string
 }
 
@@ -36,7 +34,6 @@ func Load() *Config {
 		ExternalURL:    GetEnvOrDefault("EXTERNAL_URL", "localhost"),
 		Workers:        workers,
 		ReportInterval: 3 * time.Second, // for sse
-		LogLevel:       strings.ToLower(GetEnvOrDefault("LOG_LEVEL", "info")),
 		DBPath:         GetEnvOrDefault("DATABASE_PATH", "./config/tubefeed.db"),
 	}
 	return config

@@ -4,25 +4,39 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"tubefeed/internal/config"
 )
 
+var level = new(slog.LevelVar)
+
 func createLogger() *slog.Logger {
-	var level slog.Level
-	switch config.Load().LogLevel {
+
+	logLevel := strings.ToLower(config.GetEnvOrDefault("LOG_LEVEL", "info"))
+
+	switch logLevel {
 	case "debug":
-		level = slog.LevelDebug
+		level.Set(slog.LevelDebug)
 	case "warn", "warning":
-		level = slog.LevelWarn
+		level.Set(slog.LevelWarn)
 	case "error":
-		level = slog.LevelError
-	case "info":
-		fallthrough
+		level.Set(slog.LevelError)
 	default:
-		level = slog.LevelInfo
+		level.Set(slog.LevelInfo)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
-	logger.Info(fmt.Sprintf("logger initialized (%s)", level.String()))
+	options := slog.HandlerOptions{Level: level}
+
+	var handler slog.Handler
+	logFormat := strings.ToLower(config.GetEnvOrDefault("LOG_FORMAT", "text"))
+	switch logFormat {
+	case "json":
+		handler = slog.NewJSONHandler(os.Stdout, &options)
+	default:
+		handler = slog.NewTextHandler(os.Stdout, &options)
+	}
+
+	logger := slog.New(handler)
+	logger.Info(fmt.Sprintf("logger initialized (%s)", level))
 	return logger
 }

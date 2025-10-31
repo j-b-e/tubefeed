@@ -1,4 +1,4 @@
-package yt
+package ytdlp
 
 import (
 	"context"
@@ -14,38 +14,56 @@ import (
 	"github.com/google/uuid"
 )
 
-type yt struct {
-	ytid   string // if set assumes videometadata is fully refreshed from yt
-	logger *slog.Logger
+type ytdlp struct {
+	sourceurl string // if set assumes videometadata is fully refreshed from yt
+	source    string // name of the source
+	logger    *slog.Logger
 }
 
 var (
-	ErrYoutube = errors.New("youtube error")
+	ErrYtdlp = errors.New("ytdlp error")
 )
 
 func init() {
 	provider.Register("youtube.com", newytprovider)
 	provider.Register("youtu.be", newytprovider)
+	provider.Register("archive.org", newarchiveprovider)
+}
+
+// newarchiveprovider implements ProviderNewVideoFn
+func newarchiveprovider(url string, logger *slog.Logger) (provider.SourceProvider, error) {
+	if !strings.Contains(url, "archive.org") {
+		return nil, fmt.Errorf("%w: not an archive.org url: %s", ErrYtdlp, url)
+	}
+	return &ytdlp{
+		logger:    logger.WithGroup("provider").With("name", "ytdlp", "source", "archive.org"),
+		sourceurl: url,
+		source:    "archive.org",
+	}, nil
 }
 
 // newytprovider implements ProviderNewVideoFn
 func newytprovider(url string, logger *slog.Logger) (provider.SourceProvider, error) {
 	if !strings.Contains(url, "youtube.com") && !strings.Contains(url, "youtu.be") {
-		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
+		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYtdlp, url)
 	}
-	ytid, err := extractVideoID(url)
+	ytid, err := extractYTVideoID(url)
 	if err != nil {
-		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYoutube, url)
+		return nil, fmt.Errorf("%w: not a youtube url: %s", ErrYtdlp, url)
 	}
-	return &yt{ytid: ytid, logger: logger.WithGroup("provider").With("name", "youtube")}, nil
+	return &ytdlp{
+		sourceurl: yturl(ytid),
+		logger:    logger.WithGroup("provider").With("name", "ytdlp", "source", "youtube"),
+		source:    "youtube",
+	}, nil
 }
 
-func url(ytid string) string {
+func yturl(ytid string) string {
 	return fmt.Sprintf("https://www.youtube.com/watch?v=%s", ytid)
 }
 
-func (y *yt) Url() string {
-	return url(y.ytid)
+func (y *ytdlp) URL() string {
+	return y.sourceurl
 }
 
 // func (y *yt) DownloadStream(ctx context.Context) (reader io.Reader, err error) {
@@ -82,32 +100,33 @@ func (y *yt) Url() string {
 // 	return reader, nil
 // }
 
-func (y *yt) Download(ctx context.Context, id uuid.UUID, path string) error {
+func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string) error {
 	start := time.Now()
 
-	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
+	y.logger.InfoContext(ctx, fmt.Sprintf("⏳ Starting Download of %s", y.URL()))
 	cmd := exec.CommandContext(
 		ctx,
 		"yt-dlp",
 		"--quiet",
 		"--extract-audio",
 		"--audio-format", "mp3",
+		"--playlist-items", "1", // TODO: Support playlist download
 		"-P", path,
 		"-P", "temp:.cache",
 		"-o", id.String(),
-		y.Url(),
+		y.URL(),
 	)
-	y.logger.Info(fmt.Sprintf("⏳ Running cmd %s", cmd))
+	y.logger.DebugContext(ctx, fmt.Sprintf("⏳ Running cmd %s", cmd))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, out)
+		return fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYtdlp, cmd, err, out)
 	}
-	y.logger.Info(fmt.Sprintf("✅ Finished Download of %s", y.Url()), "download.time", time.Since(start).String())
+	y.logger.InfoContext(ctx, fmt.Sprintf("✅ Finished Download of %s", y.URL()), "download.time", time.Since(start).String())
 	return nil
 }
 
 // Refreshes YouTube video metadata
-func (y *yt) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) {
+func (y *ytdlp) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) {
 	var err error
 	cmd := exec.CommandContext(
 		ctx,
@@ -115,38 +134,59 @@ func (y *yt) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) {
 		"--quiet",
 		"--skip-download",
 		"--dump-json",
-		y.Url(),
+		"--playlist-items", "1", // TODO: Support playlist download
+		y.URL(),
 	)
 	y.logger.Info(fmt.Sprintf("⏳ running cmd: %s", cmd))
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, out)
+		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYtdlp, cmd, err, out)
 	}
 	var result map[string]any
 	err = json.Unmarshal([]byte(out), &result)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrYoutube, err)
+		return nil, fmt.Errorf("%w: %v", ErrYtdlp, err)
 	}
 
-	if result["id"] != y.ytid {
-		return nil, fmt.Errorf("%w: video id from result didnt match", ErrYoutube)
+	if y.source == "youtube" && yturl(result["id"].(string)) != y.sourceurl {
+		return nil, fmt.Errorf("%w: video id from result didnt match", ErrYtdlp)
 	}
+	uploader, ok := result["uploader"].(string)
+	if !ok {
+		uploader = "unknown"
+	}
+	description, ok := result["description"].(string)
+	if !ok {
+		description = "unknown"
+	}
+	url, ok := result["url"].(string)
+	if !ok {
+		if y.source == "youtube" {
+			url, ok = result["original_url"].(string)
+			if !ok {
+				return nil, fmt.Errorf("%w: unable to retrieve url for youtube", ErrYtdlp)
+			}
+		} else {
+			return nil, fmt.Errorf("%w: unable to retrieve url", ErrYtdlp)
+		}
+	}
+
 	meta := provider.SourceMeta{
-		ProviderID:  y.ytid,
+		ProviderID:  y.sourceurl,
 		Title:       result["title"].(string),
-		Channel:     result["uploader"].(string),
+		Channel:     uploader,
 		Length:      time.Duration(int(result["duration"].(float64))) * time.Second,
-		URL:         y.Url(),
-		Description: result["description"].(string),
+		URL:         url,
+		Description: description,
 	}
 	return &meta, nil
 }
 
 // Extracts video ID from the provided YouTube URL
-func extractVideoID(url string) (string, error) {
+func extractYTVideoID(url string) (string, error) {
 	if strings.Contains(url, "v=") {
 		parts := strings.Split(url, "v=")
 		return strings.Split(parts[1], "&")[0], nil
 	}
-	return "", fmt.Errorf("%w: no video URL", ErrYoutube)
+	return "", fmt.Errorf("%w: no video URL", ErrYtdlp)
 }

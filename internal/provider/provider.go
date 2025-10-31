@@ -2,20 +2,17 @@ package provider
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-type ProviderNewSourceFn func(url string, logger *slog.Logger) (SourceProvider, error)
 
 // SourceProvider can handle MEdia of a domain
 type SourceProvider interface {
 	LoadMetadata(ctx context.Context) (*SourceMeta, error)         // Provider starts requesting metadata
 	Download(ctx context.Context, id uuid.UUID, path string) error // Provider downloads Source to path atomically
 	//DownloadStream(id uuid.UUID) (io.Reader, error) // Download Source and return a Reader
-	Url() string // Url to specific Source
+	URL() string // Url to specific Source
 }
 
 type SourceMeta struct {
@@ -27,18 +24,4 @@ type SourceMeta struct {
 	Description  string
 	URL          string
 	ThumbnailURL string
-}
-
-var registry = make(map[string]ProviderNewSourceFn)
-
-// Register provider for a domain
-func Register(domain string, p ProviderNewSourceFn) {
-	registry[domain] = p
-}
-
-func Get(name string) ProviderNewSourceFn {
-	if fn, ok := registry[name]; ok {
-		return fn
-	}
-	return nil
 }
