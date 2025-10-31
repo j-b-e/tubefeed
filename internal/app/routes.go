@@ -25,8 +25,11 @@ var (
 
 // GET /
 func (a App) getRootHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "getRootHandler")
 	requests, err := a.Store.LoadDatabase(c.Request.Context())
 	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
@@ -61,7 +64,7 @@ func (a App) createAudioHandler(c *gin.Context) {
 	duplicate, err := a.Store.CheckforDuplicate(ctx, itemURL, uuid.MustParse(models.Default_playlist_id))
 	a.checkMu.Unlock()
 	if err != nil {
-		logger.Error(err.Error())
+		logger.ErrorContext(ctx, err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
@@ -78,7 +81,7 @@ func (a App) createAudioHandler(c *gin.Context) {
 	// send request to worker
 	uuidv7, err := uuid.NewV7()
 	if err != nil {
-		logger.Error(err.Error())
+		logger.ErrorContext(ctx, err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
@@ -120,7 +123,7 @@ func (a App) deleteAudioHandler(c *gin.Context) {
 	logger := a.logger.With("handler", "deleteAudio")
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		logger.Error(err.Error())
+		logger.ErrorContext(ctx, err.Error())
 		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return
 	}
@@ -128,7 +131,7 @@ func (a App) deleteAudioHandler(c *gin.Context) {
 	// Delete the video from the database
 	err = a.deleteVideo(ctx, id)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.ErrorContext(ctx, err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
@@ -142,7 +145,7 @@ func (a App) streamAudio(c *gin.Context) {
 	audioID := c.Param("id")
 	audioUUID, err := uuid.Parse(audioID)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.ErrorContext(ctx, err.Error())
 		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return
 	}
@@ -169,7 +172,7 @@ func (a App) streamAudio(c *gin.Context) {
 	// Check if a download is already in progress
 	if inProgress, _ := downloadInProgress.Load(audioID); inProgress == true {
 		// Return early with a message indicating the download is in progress
-		logger.Info(fmt.Sprintf("download of id %s in progress", audioID))
+		logger.InfoContext(ctx, fmt.Sprintf("download of id %s in progress", audioID))
 		c.JSON(http.StatusProcessing, gin.H{"message": "Audio download in progress, please try again later"})
 		return
 	}
@@ -191,7 +194,7 @@ func (a App) streamAudio(c *gin.Context) {
 	if !fileExists(audioFilePath) {
 		item, err := a.Store.GetItem(ctx, audioUUID)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.ErrorContext(ctx, err.Error())
 			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 			return
 		}
@@ -199,12 +202,12 @@ func (a App) streamAudio(c *gin.Context) {
 			defer audioMutex.Unlock()
 			source, err := downloader.NewSource(item.ID, item.SourceURL, a.logger)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.ErrorContext(ctx, err.Error())
 				return
 			}
 			err = source.Download(ctx, audioFilePath)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.ErrorContext(ctx, err.Error())
 				return
 			}
 		}()

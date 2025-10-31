@@ -70,7 +70,7 @@ func (w *Worker) handleError(ctx context.Context, item *models.Request, logger *
 }
 
 func (w *Worker) start(bctx context.Context) {
-	w.logger.Info("worker started")
+	w.logger.InfoContext(bctx, "worker started")
 	for item := range w.request {
 		ctx, cancel := context.WithTimeout(bctx, time.Duration(time.Hour))
 		wlog := w.logger.With("item", item.ID)
@@ -144,5 +144,5 @@ func (w *Worker) start(bctx context.Context) {
 			}
 		}(ctx, &item)
 	}
-	w.logger.Info("worker stopped")
+	w.logger.InfoContext(bctx, "worker stopped")
 }

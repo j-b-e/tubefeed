@@ -68,7 +68,7 @@ func (y *ytdlp) URL() string {
 
 // func (y *yt) DownloadStream(ctx context.Context) (reader io.Reader, err error) {
 // 	start := time.Now()
-// 	y.logger.Info(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
+// 	y.logger.InfoContext(fmt.Sprintf("⏳ Starting Download of %s", y.Url()))
 // 	cmd := exec.Command(
 // 		"yt-dlp",
 // 		"--quiet",
@@ -86,7 +86,7 @@ func (y *ytdlp) URL() string {
 // 	if err != nil {
 // 		return nil, fmt.Errorf("%w: failed stderr pipe for cmd %s: %v", ErrYoutube, cmd, err)
 // 	}
-// 	y.logger.Info(fmt.Sprintf("⏳ Running cmd %s", cmd))
+// 	y.logger.InfoContext(fmt.Sprintf("⏳ Running cmd %s", cmd))
 // 	err = cmd.Start()
 // 	if err != nil {
 // 		errOutput, _ := io.ReadAll(stderr)
@@ -96,7 +96,7 @@ func (y *ytdlp) URL() string {
 // 		errOutput, _ := io.ReadAll(stderr)
 // 		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYoutube, cmd, err, errOutput)
 // 	}
-// 	y.logger.Info(fmt.Sprintf("✅ Finished Download of %s", y.Url()), "download.time", time.Since(start).String())
+// 	y.logger.InfoContext(fmt.Sprintf("✅ Finished Download of %s", y.Url()), "download.time", time.Since(start).String())
 // 	return reader, nil
 // }
 
@@ -137,7 +137,7 @@ func (y *ytdlp) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) 
 		"--playlist-items", "1", // TODO: Support playlist download
 		y.URL(),
 	)
-	y.logger.Info(fmt.Sprintf("⏳ running cmd: %s", cmd))
+	y.logger.InfoContext(ctx, fmt.Sprintf("⏳ running cmd: %s", cmd))
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYtdlp, cmd, err, out)

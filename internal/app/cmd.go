@@ -95,7 +95,7 @@ func (a App) Run() (err error) {
 		if err != nil {
 			panic(err)
 		}
-		a.logger.Info("Sqlite db initalized", "path", a.config.DBPath)
+		a.logger.InfoContext(ctx, "Sqlite db initalized", "path", a.config.DBPath)
 	}
 
 	defer func() {

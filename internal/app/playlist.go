@@ -9,6 +9,7 @@ import (
 )
 
 func (a App) createPlaylistHandler(c *gin.Context) {
+	logger := a.logger.With("handler", "createPlaylistHandler")
 	ctx := c.Request.Context()
 	var body struct {
 		Name string `json:"name" binding:"required"`
@@ -24,11 +25,13 @@ func (a App) createPlaylistHandler(c *gin.Context) {
 
 	uuid, err := uuid.NewV7()
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		logger.ErrorContext(ctx, err.Error())
+		c.JSON(500, gin.H{"error": "error with uuid"})
 		return
 	}
 	err = a.Store.CreatePlaylist(ctx, uuid, body.Name)
 	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
 		c.JSON(500, gin.H{"error": "createPlaylist failed"})
 		return
 	}
@@ -36,6 +39,7 @@ func (a App) createPlaylistHandler(c *gin.Context) {
 }
 func (a App) getPlaylistHandler(c *gin.Context) {
 	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "getPlaylistHandler")
 	id := c.Param("id")
 	uuid, err := uuid.Parse(id)
 	if err != nil {
@@ -44,6 +48,7 @@ func (a App) getPlaylistHandler(c *gin.Context) {
 	}
 	playlist, err := a.Store.GetPlaylist(ctx, uuid)
 	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
 		c.JSON(500, gin.H{"error": "getPlaylist failed"})
 		return
 	}
@@ -51,6 +56,7 @@ func (a App) getPlaylistHandler(c *gin.Context) {
 }
 func (a App) deletePlaylistHandler(c *gin.Context) {
 	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "deletePlaylistHandler")
 	id := c.Param("id")
 	if id == models.Default_playlist_id {
 		c.JSON(400, gin.H{"error": "cannot delete default playlist"})
@@ -63,6 +69,7 @@ func (a App) deletePlaylistHandler(c *gin.Context) {
 	}
 	err = a.Store.DeletePlaylist(ctx, uuid)
 	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
 		c.JSON(500, gin.H{"error": "deletetPlaylist failed"})
 		return
 	}
@@ -71,6 +78,7 @@ func (a App) deletePlaylistHandler(c *gin.Context) {
 
 func (a App) updatePlaylistHandler(c *gin.Context) {
 	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "updatePlaylistHandler")
 	id := c.Param("id")
 	uuid, err := uuid.Parse(id)
 	if err != nil {
@@ -90,6 +98,7 @@ func (a App) updatePlaylistHandler(c *gin.Context) {
 	}
 	err = a.Store.UpdatePlaylist(ctx, uuid, body.Name)
 	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
 		c.JSON(500, gin.H{"error": "updatePlaylist failed"})
 		return
 	}
@@ -98,8 +107,10 @@ func (a App) updatePlaylistHandler(c *gin.Context) {
 
 func (a App) listPlaylistHandler(c *gin.Context) {
 	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "listPlaylistHandler")
 	playlists, err := a.Store.ListPlaylist(ctx)
 	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
 		c.JSON(500, gin.H{"error": "listPlaylist failed"})
 		return
 	}
