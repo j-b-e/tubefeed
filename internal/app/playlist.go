@@ -26,7 +26,7 @@ func (a App) htmxPlaylist(c *gin.Context) {
 		return
 	}
 	c.HTML(http.StatusOK, "itemlist.html", gin.H{
-		"Items": playlist,
+		"Items": playlist, "playlist_id": id,
 	})
 }
 

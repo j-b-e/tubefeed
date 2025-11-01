@@ -156,19 +156,16 @@ func (db *Database) UpdateItem(
 	ctx context.Context,
 	item models.Request,
 ) error {
-	err := db.queries.UpdateAudio(
-		ctx,
-		sqlc.UpdateAudioParams{
-			ID:         item.ID,
-			Title:      item.Title,
-			Channel:    item.Channel,
-			Status:     string(item.Status),
-			Length:     sql.NullInt64{Int64: int64(item.Length.Seconds())},
-			SourceUrl:  item.SourceURL,
-			PlaylistID: item.Playlist,
-			UpdatedAt:  sql.NullTime{Time: time.Now(), Valid: true},
-		},
-	)
+	err := db.queries.CreateAudio(ctx, sqlc.CreateAudioParams{
+		ID:         item.ID,
+		Title:      item.Title,
+		Channel:    item.Channel,
+		Status:     string(item.Status),
+		Length:     sql.NullInt64{Int64: int64(item.Length.Seconds())},
+		SourceUrl:  item.SourceURL,
+		PlaylistID: item.Playlist,
+		UpdatedAt:  sql.NullTime{Time: time.Now(), Valid: true},
+	})
 	if err != nil {
 		return dbErr(err)
 	}
@@ -244,4 +241,23 @@ func (db *Database) UpdatePlaylist(ctx context.Context, id uuid.UUID, name strin
 // ListPlaylist returns all playlists from the database
 func (db *Database) ListPlaylist(context.Context) ([]models.Playlist, error) {
 	panic("not implemented") // TODO: Implement
+}
+
+func (db *Database) CreateItem(ctx context.Context, item models.Request) error {
+	err := db.queries.CreateAudio(ctx, sqlc.CreateAudioParams{
+		ID:         item.ID,
+		Title:      item.Title,
+		Channel:    item.Channel,
+		Length:     sql.NullInt64{Int64: 0},
+		Size:       sql.NullInt64{Int64: 0},
+		SourceUrl:  item.SourceURL,
+		Status:     string(item.Status),
+		ProviderID: uuid.UUID{},
+		PlaylistID: item.Playlist,
+		UpdatedAt:  sql.NullTime{Time: time.Now()},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

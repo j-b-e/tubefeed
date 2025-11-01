@@ -6,7 +6,7 @@
   size            INTEGER,  -- size is in bytes
   source_url      TEXT NOT NULL,
   status          TEXT NOT NULL,
-  provider_id     uuid,
+  provider_id     uuid NOT NULL,
   playlist_id     uuid,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP,

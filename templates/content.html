@@ -67,6 +67,7 @@
                 item.querySelector(".status").textContent = "❌ " + data.error;
             }
         }
+        htmx.trigger('.table', 'refresh')
     };
 
     const btn = document.getElementById('copy-btn');
