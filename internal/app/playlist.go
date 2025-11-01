@@ -2,11 +2,33 @@ package app
 
 import (
 	"io"
+	"net/http"
 	"tubefeed/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+func (a App) htmxPlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
+	logger := a.logger.With("handler", "htmxPlaylist")
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	playlist, err := a.Store.LoadFromPlaylist(ctx, id)
+	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.HTML(http.StatusOK, "itemlist.html", gin.H{
+		"Items": playlist,
+	})
+}
 
 func (a App) createPlaylistHandler(c *gin.Context) {
 	logger := a.logger.With("handler", "createPlaylistHandler")

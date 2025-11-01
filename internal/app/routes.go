@@ -205,7 +205,7 @@ func (a App) streamAudio(c *gin.Context) {
 				logger.ErrorContext(ctx, err.Error())
 				return
 			}
-			err = source.Download(ctx, audioFilePath)
+			err = source.Download(ctx, audioFilePath, nil)
 			if err != nil {
 				logger.ErrorContext(ctx, err.Error())
 				return

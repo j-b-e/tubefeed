@@ -50,6 +50,12 @@ func (a App) Init() *gin.Engine {
 	api.GET("/", a.apiGetRootHandler)
 	api.POST("/audio", a.createAudioHandler)
 	api.GET("/audio/:id", a.streamAudio)
+	// Playlists
+	api.POST("/playlist", a.createPlaylistHandler)
+	api.GET("/playlist", a.listPlaylistHandler)
+	api.GET("/playlist/:id", a.getPlaylistHandler)
+	api.DELETE("/playlist/:id", a.deletePlaylistHandler)
+	api.PATCH("/playlist/:id", a.updatePlaylistHandler)
 
 	r.LoadHTMLFS(http.FS(templates.FS), "*")
 
@@ -65,12 +71,8 @@ func (a App) Init() *gin.Engine {
 	r.DELETE("/audio/:id", a.deleteAudioHandler)
 	//r.PATCH("/audio/:id", a.patchAudioHandler)
 
-	// Playlists
-	r.POST("/playlist", a.createPlaylistHandler)
-	r.GET("/playlist", a.listPlaylistHandler)
-	r.GET("/playlist/:id", a.getPlaylistHandler)
-	r.DELETE("/playlist/:id", a.deletePlaylistHandler)
-	r.PATCH("/playlist/:id", a.updatePlaylistHandler)
+	// htmx
+	r.GET("/playlist/:id", a.htmxPlaylist)
 
 	r.GET("/rss/:id", a.getRSSHandler)
 

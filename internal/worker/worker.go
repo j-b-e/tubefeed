@@ -130,10 +130,17 @@ func (w *Worker) start(bctx context.Context) {
 			if err != nil {
 				return
 			}
-			err = source.Download(ctx, w.path)
+			var progress = make(chan int)
+			go func() {
+				for i := range progress {
+					item.Progress = i
+				}
+			}()
+			err = source.Download(ctx, w.path, progress)
 			if err != nil {
 				return
 			}
+
 			// complete -> StatusReady
 			item.Status = models.StatusReady
 			item.Done = true

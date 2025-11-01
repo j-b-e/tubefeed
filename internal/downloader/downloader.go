@@ -27,7 +27,7 @@ type Provider struct {
 	List ProviderList
 }
 
-func (vm *Source) Download(ctx context.Context, path string) error {
+func (vm *Source) Download(ctx context.Context, path string, progress chan<- int) error {
 	if vm.provider == nil {
 		domain, err := utils.ExtractDomain(vm.URL)
 		if err != nil {
@@ -47,7 +47,7 @@ func (vm *Source) Download(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	return vm.provider.Download(ctx, vm.ID, path)
+	return vm.provider.Download(ctx, vm.ID, path, progress)
 }
 
 // NewSource initializes a new downloader based on the URL domain

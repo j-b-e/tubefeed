@@ -4,7 +4,7 @@
   channel         TEXT NOT NULL,
   length          INTEGER,  -- length is in seconds
   size            INTEGER,  -- size is in bytes
-  source_url             TEXT NOT NULL,
+  source_url      TEXT NOT NULL,
   status          TEXT NOT NULL,
   provider_id     uuid,
   playlist_id     uuid,

@@ -1,12 +1,14 @@
 package ytdlp
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 	"tubefeed/internal/provider"
@@ -86,7 +88,7 @@ func (y *ytdlp) URL() string {
 // 	if err != nil {
 // 		return nil, fmt.Errorf("%w: failed stderr pipe for cmd %s: %v", ErrYoutube, cmd, err)
 // 	}
-// 	y.logger.InfoContext(fmt.Sprintf("⏳ Running cmd %s", cmd))
+// 	y.logger.DebugContext(fmt.Sprintf("⏳ Running cmd %s", cmd))
 // 	err = cmd.Start()
 // 	if err != nil {
 // 		errOutput, _ := io.ReadAll(stderr)
@@ -100,7 +102,7 @@ func (y *ytdlp) URL() string {
 // 	return reader, nil
 // }
 
-func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string) error {
+func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanProgress chan<- int) error {
 	start := time.Now()
 
 	y.logger.InfoContext(ctx, fmt.Sprintf("⏳ Starting Download of %s", y.URL()))
@@ -108,6 +110,10 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string) error {
 		ctx,
 		"yt-dlp",
 		"--quiet",
+		//"--limit-rate", "100K",
+		"--progress-delta", "5",
+		"--progress",
+		"--progress-template", "%(progress._percent)d",
 		"--extract-audio",
 		"--audio-format", "mp3",
 		"--playlist-items", "1", // TODO: Support playlist download
@@ -117,10 +123,47 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string) error {
 		y.URL(),
 	)
 	y.logger.DebugContext(ctx, fmt.Sprintf("⏳ Running cmd %s", cmd))
-	out, err := cmd.CombinedOutput()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYtdlp, cmd, err, out)
+		return err
 	}
+	if err = cmd.Start(); err != nil {
+		return err
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		// search for '\r'
+		for i, b := range data {
+			if b == '\r' {
+				return i + 1, data[:i], nil
+			}
+		}
+		if atEOF && len(data) > 0 {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
+	var progress int
+	for scanner.Scan() {
+		output := scanner.Text()
+		progress, _ = strconv.Atoi(output)
+		y.logger.DebugContext(ctx, fmt.Sprintf("command progress output: %s / %d", output, progress))
+		chanProgress <- progress
+		if progress >= 100 {
+			close(chanProgress)
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		y.logger.DebugContext(ctx, fmt.Sprintf("scanner err: %v", err))
+		return err
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("%w: failed cmd %s: %v", ErrYtdlp, cmd, err)
+	}
+
 	y.logger.InfoContext(ctx, fmt.Sprintf("✅ Finished Download of %s", y.URL()), "download.time", time.Since(start).String())
 	return nil
 }
@@ -137,7 +180,7 @@ func (y *ytdlp) LoadMetadata(ctx context.Context) (*provider.SourceMeta, error) 
 		"--playlist-items", "1", // TODO: Support playlist download
 		y.URL(),
 	)
-	y.logger.InfoContext(ctx, fmt.Sprintf("⏳ running cmd: %s", cmd))
+	y.logger.DebugContext(ctx, fmt.Sprintf("⏳ running cmd: %s", cmd))
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed cmd %s: %v: %s", ErrYtdlp, cmd, err, out)
