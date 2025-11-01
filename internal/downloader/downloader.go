@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,25 +28,32 @@ type Provider struct {
 	List ProviderList
 }
 
+type ErrDownloader error
+
 func (vm *Source) Download(ctx context.Context, path string, progress chan<- int) error {
 	if vm.provider == nil {
 		domain, err := utils.ExtractDomain(vm.URL)
 		if err != nil {
-			return err
+			vm.logger.ErrorContext(ctx, "failed to extract domain")
+			return ErrDownloader(err)
 		}
-		new := provider.Get(domain)
-		if new == nil {
-			return fmt.Errorf("failed to Download")
+		newprovider := provider.Get(domain)
+		if newprovider == nil {
+			vm.logger.ErrorContext(ctx, "no provider found")
+			return ErrDownloader(errors.New("no provider found"))
 		}
-		provider, err := new(vm.URL, vm.logger)
+		provider, err := newprovider(vm.URL, vm.logger)
 		if err != nil {
-			return err
+			vm.logger.ErrorContext(ctx, fmt.Sprintf("provider failed: %v", err))
+			return ErrDownloader(err)
 		}
 		vm.provider = provider
 	}
+
 	_, err := os.Stat(path)
 	if err != nil {
-		return err
+		vm.logger.ErrorContext(ctx, fmt.Sprintf("stat failed: %v", err))
+		return ErrDownloader(err)
 	}
 	return vm.provider.Download(ctx, vm.ID, path, progress)
 }

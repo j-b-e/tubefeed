@@ -103,6 +103,7 @@ func (y *ytdlp) URL() string {
 // }
 
 func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanProgress chan<- int) error {
+	defer close(chanProgress)
 	start := time.Now()
 
 	y.logger.InfoContext(ctx, fmt.Sprintf("⏳ Starting Download of %s", y.URL()))
@@ -125,12 +126,8 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanPro
 	y.logger.DebugContext(ctx, fmt.Sprintf("⏳ Running cmd %s", cmd))
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: pipe failed cmd %s: %v", ErrYtdlp, cmd, err)
 	}
-	if err = cmd.Start(); err != nil {
-		return err
-	}
-
 	scanner := bufio.NewScanner(stdout)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		// search for '\r'
@@ -144,15 +141,20 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanPro
 		}
 		return 0, nil, nil
 	})
+	if err = cmd.Start(); err != nil {
+		return fmt.Errorf("%w: start failed cmd %s: %v", ErrYtdlp, cmd, err)
+	}
 	var progress int
 	for scanner.Scan() {
 		output := scanner.Text()
 		progress, _ = strconv.Atoi(output)
 		y.logger.DebugContext(ctx, fmt.Sprintf("command progress output: %s / %d", output, progress))
-		chanProgress <- progress
-		if progress >= 100 {
-			close(chanProgress)
-			break
+		select {
+		case chanProgress <- progress:
+			continue
+		case <-ctx.Done():
+			y.logger.ErrorContext(ctx, "ctx closed while scanning")
+			return fmt.Errorf("ctx closed while scanning")
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -161,7 +163,7 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanPro
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("%w: failed cmd %s: %v", ErrYtdlp, cmd, err)
+		return fmt.Errorf("%w: wait failed cmd %s: %v", ErrYtdlp, cmd, err)
 	}
 
 	y.logger.InfoContext(ctx, fmt.Sprintf("✅ Finished Download of %s", y.URL()), "download.time", time.Since(start).String())

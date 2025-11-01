@@ -9,8 +9,9 @@ import (
 
 // SourceProvider can handle MEdia of a domain
 type SourceProvider interface {
-	LoadMetadata(ctx context.Context) (*SourceMeta, error)                              // Provider starts requesting metadata
-	Download(ctx context.Context, id uuid.UUID, path string, progress chan<- int) error // Provider downloads Source to path atomically
+	LoadMetadata(ctx context.Context) (*SourceMeta, error) // Provider starts requesting metadata
+	// Provider downloads Source to path atomically. It must close progress channel.
+	Download(ctx context.Context, id uuid.UUID, path string, progress chan<- int) error
 	//DownloadStream(id uuid.UUID) (io.Reader, error) // Download Source and return a Reader
 	URL() string // Url to specific Source
 }

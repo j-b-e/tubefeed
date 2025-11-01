@@ -3,6 +3,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -130,14 +131,22 @@ func (w *Worker) start(bctx context.Context) {
 			if err != nil {
 				return
 			}
+
+			// Create and check a progress channel given to the downloader->provider
+			//  With a custom error to close this chan its safe but still bad style
 			var progress = make(chan int)
 			go func() {
 				for i := range progress {
-					item.Progress = i
+					if i > item.Progress {
+						item.Progress = i
+					}
 				}
 			}()
 			err = source.Download(ctx, w.path, progress)
 			if err != nil {
+				if errors.As(err, new(downloader.ErrDownloader)) {
+					close(progress)
+				}
 				return
 			}
 
