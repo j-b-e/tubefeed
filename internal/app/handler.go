@@ -146,15 +146,22 @@ func (a App) streamAudio(c *gin.Context) {
 	audioUUID, err := uuid.Parse(audioID)
 	if err != nil {
 		logger.ErrorContext(ctx, err.Error())
-		c.AbortWithStatusJSON(http.StatusBadRequest, err)
+		c.String(http.StatusBadRequest, "invalid uuid")
 		return
 	}
+	_, err = a.Store.GetItem(ctx, audioUUID)
+	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
+		c.String(http.StatusNotFound, "item not found")
+		return
+	}
+
 	audioFilePath := filepath.Join(a.config.AudioPath, fmt.Sprintf("%s.mp3", audioID))
 
 	// Check if the file exists
 	if fileExists(audioFilePath) {
 		if _, ok := c.GetQuery("check"); ok {
-			c.Status(http.StatusOK)
+			c.String(http.StatusOK, "item found")
 			return
 		}
 		if _, ok := c.GetQuery("download"); ok {
@@ -195,7 +202,7 @@ func (a App) streamAudio(c *gin.Context) {
 		item, err := a.Store.GetItem(ctx, audioUUID)
 		if err != nil {
 			logger.ErrorContext(ctx, err.Error())
-			c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+			c.String(http.StatusNotFound, err.Error())
 			return
 		}
 		go func() {
@@ -212,7 +219,7 @@ func (a App) streamAudio(c *gin.Context) {
 			}
 		}()
 	}
-	c.JSON(http.StatusProcessing, gin.H{"msg": "Audio is processing"})
+	c.JSON(http.StatusProcessing, gin.H{"msg": "Audio is processing, please try again later"})
 }
 
 // Deletes a video by ID from the database

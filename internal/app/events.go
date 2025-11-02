@@ -3,9 +3,11 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 	"tubefeed/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -36,9 +38,19 @@ func (a App) broadcastProgress(r *models.Request) {
 }
 
 func (a App) eventsHandler(c *gin.Context) {
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		_ = c.AbortWithError(
+			http.StatusInternalServerError,
+			fmt.Errorf("streaming unsupported"),
+		)
+		return
+	}
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Status(http.StatusOK)
+	flusher.Flush()
 
 	messageChan := make(chan string)
 	clientsMu.Lock()
@@ -52,22 +64,15 @@ func (a App) eventsHandler(c *gin.Context) {
 		close(messageChan)
 	}()
 
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		http.Error(c.Writer, "Streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	for {
+	keepalive := time.NewTicker(time.Second * 30)
+	defer keepalive.Stop()
+	c.Stream(func(w io.Writer) bool {
 		select {
 		case msg := <-messageChan:
-			_, err := fmt.Fprintf(c.Writer, "data: %s\n\n", msg)
-			if err != nil {
-				a.logger.ErrorContext(c.Request.Context(), err.Error())
-			}
-			flusher.Flush()
-		case <-c.Request.Context().Done():
-			return
+			c.SSEvent("", msg)
+		case <-keepalive.C:
+			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
 		}
-	}
+		return true
+	})
 }

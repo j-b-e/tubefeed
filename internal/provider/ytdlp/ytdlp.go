@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 	"tubefeed/internal/provider"
@@ -100,13 +99,37 @@ func (y *ytdlp) URL() string {
 // 	}
 // 	y.logger.InfoContext(fmt.Sprintf("✅ Finished Download of %s", y.Url()), "download.time", time.Since(start).String())
 // 	return reader, nil
-// }
+//
+
+// ytldprogress is customized progress report defined through specific ytdlp arguments
+type Ytdlpprogress struct {
+	// yt-dlp --quiet --progress-delta 5 --progress --progress-template 'download:{"type":"download","status":"%(progress.status)s","progress":%(progress._percent)d}' --progress-template 'postprocess:{"type":"process","status":"%(progress.status)s","postprocessor":"%(progress.postprocessor)s"}' --extract-audio --audio-format mp3 --playlist-items 1 -P . -P temp:cache -o out124 "https://archive.org/details/cosmos_1980" | tr '\r' '\n'
+	// {"type":"download","status":"downloading","progress":3}
+	// {"type":"download","status":"downloading","progress":9}
+	// {"type":"download","status":"downloading","progress":27}
+	// {"type":"download","status":"downloading","progress":43}
+	// {"type":"download","status":"downloading","progress":60}
+	// {"type":"download","status":"downloading","progress":77}
+	// {"type":"download","status":"downloading","progress":94}
+	// {"type":"download","status":"finished","progress":100}
+	// {"type":"process","status":"started","postprocessor":"ExtractAudio"}
+	// {"type":"process","status":"finished","postprocessor":"ExtractAudio"}
+	// {"type":"process","status":"started","postprocessor":"MoveFiles"}
+	// {"type":"process","status":"finished","postprocessor":"MoveFiles"}
+	// {"type":"process","status":"started","postprocessor":"Concat"}
+	// {"type":"process","status":"finished","postprocessor":"Concat"}
+	Typ           string `json:"type"`
+	Status        string `json:"status"`
+	Progress      int    `json:"progress,omitempty"`
+	Postprocessor string `json:"postprocessor,omitempty"`
+}
 
 func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanProgress chan<- int) error {
 	defer close(chanProgress)
 	start := time.Now()
 
 	y.logger.InfoContext(ctx, fmt.Sprintf("⏳ Starting Download of %s", y.URL()))
+
 	cmd := exec.CommandContext(
 		ctx,
 		"yt-dlp",
@@ -114,7 +137,8 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanPro
 		//"--limit-rate", "100K",
 		"--progress-delta", "5",
 		"--progress",
-		"--progress-template", "%(progress._percent)d",
+		"--progress-template", "download:{\"type\":\"downloading\",\"status\":\"%(progress.status)s\",\"progress\":%(progress._percent)d}", // -> {"type":"download","status":"downloading","progress":1}
+		"--progress-template", "postprocess:{\"type\":\"process\",\"status\":\"%(progress.status)s\",\"postprocessor\":\"%(progress.postprocessor)s\"}", // -> {"type":"process","status":"started","postprocessor":"ExtractAudio"}
 		"--extract-audio",
 		"--audio-format", "mp3",
 		"--playlist-items", "1", // TODO: Support playlist download
@@ -144,13 +168,18 @@ func (y *ytdlp) Download(ctx context.Context, id uuid.UUID, path string, chanPro
 	if err = cmd.Start(); err != nil {
 		return fmt.Errorf("%w: start failed cmd %s: %v", ErrYtdlp, cmd, err)
 	}
-	var progress int
+
+	var progress Ytdlpprogress
 	for scanner.Scan() {
-		output := scanner.Text()
-		progress, _ = strconv.Atoi(output)
-		y.logger.DebugContext(ctx, fmt.Sprintf("command progress output: %s / %d", output, progress))
+		output := scanner.Bytes()
+		err = json.Unmarshal(output, &progress)
+		if err != nil {
+			y.logger.ErrorContext(ctx, fmt.Sprintf("failed to unmarshal ytdlp progress: %s", output))
+			continue
+		}
+		y.logger.DebugContext(ctx, fmt.Sprintf("command progress output: %s / %#v", output, progress))
 		select {
-		case chanProgress <- progress:
+		case chanProgress <- progress.Progress:
 			continue
 		case <-ctx.Done():
 			y.logger.ErrorContext(ctx, "ctx closed while scanning")
