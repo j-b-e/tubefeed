@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"tubefeed/internal/config"
 	"tubefeed/internal/models"
 	"tubefeed/internal/rss"
+	"tubefeed/internal/sse"
 	"tubefeed/internal/store"
 	"tubefeed/internal/worker"
 	"tubefeed/templates"
@@ -27,17 +29,20 @@ type App struct {
 	report      chan models.Request
 	logger      *slog.Logger
 	checkMu     *sync.Mutex
+	sseManager  sse.Manager
 }
 
 // Setup initializes the app with the given version
 func Setup(version string) App {
 	c := config.Load()
+	logger := createLogger()
 	return App{
-		logger:  createLogger(),
-		config:  c,
-		rss:     rss.NewRSS(c.ExternalURL),
-		version: version,
-		checkMu: new(sync.Mutex),
+		logger:     logger,
+		config:     c,
+		rss:        rss.NewRSS(c.ExternalURL),
+		version:    version,
+		checkMu:    new(sync.Mutex),
+		sseManager: sse.NewManager(logger.With("service", "sse").WithGroup("sse")),
 	}
 }
 
@@ -82,7 +87,7 @@ func (a App) Init() *gin.Engine {
 	})
 
 	// SSE Endpoint
-	r.GET("/events", a.eventsHandler)
+	r.GET("/events", a.sseManager.Handler)
 	return r
 }
 
@@ -126,4 +131,12 @@ func (a App) Run() (err error) {
 
 	r := a.Init()
 	return r.Run(fmt.Sprintf(":%s", a.config.ListenPort))
+}
+
+func (a App) reportworker(logger *slog.Logger) {
+	logger.Info("reportworker for SSE started")
+	for m := range a.report {
+		msg, _ := json.Marshal(m)
+		a.sseManager.Broadcast(string(msg))
+	}
 }
