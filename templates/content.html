@@ -11,6 +11,33 @@
     </fieldset>
 </form>
 
+<div id="playlist-menu">
+    <div class="playlist-selector" id="playlist-selector">
+        {{ template "playlist.html" . }}
+    </div>
+    <button id="delete-playlist-btn" type="button" hx-delete="api/v1/playlist" hx-include="#playlist-select"
+        hx-confirm="Are you sure you want to delete this playlist? All Media will move to the default playlist."
+        hx-target="#playlist-selector">
+        Delete
+    </button>
+    <button id="new-playlist-btn" type="button"
+        hx-on:click="const form=document.getElementById('new-playlist-form');form.style.display='block';document.getElementById('playlist-name').focus()">+
+        New</button>
+    <div id="new-playlist-form" style="display: none;">
+        <form hx-post="/playlist" hx-target="#playlist-selector" hx-target-error="#popup-container">
+            <fieldset>
+                <legend>Create New Playlist</legend>
+                <label for="playlist-name">Name</label>
+                <input type="text" id="playlist-name" name="name" placeholder="Enter Name" maxlength=120 required>
+                <button type="submit"
+                    hx-on:click="const form=document.getElementById('new-playlist-form');form.style.display='none'">Create</button>
+                <button type="button" id="cancel-playlist-btn"
+                    hx-on:click="const form=document.getElementById('new-playlist-form');form.style.display='none'">Cancel</button>
+            </fieldset>
+        </form>
+    </div>
+</div>
+
 <h2>Playlist <span class="playlist-name">{{ .playlist_name }}</span></h2>
 <div id="audio-list">
     {{ template "itemlist.html" . }}

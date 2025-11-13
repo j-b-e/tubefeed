@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"tubefeed/internal/models"
@@ -30,35 +32,51 @@ func (a App) htmxPlaylist(c *gin.Context) {
 	})
 }
 
-func (a App) createPlaylistHandler(c *gin.Context) {
+// POST /playlist (from form)
+func (a App) createPlaylistFromFormHandler(c *gin.Context) {
 	logger := a.logger.With("handler", "createPlaylistHandler")
 	ctx := c.Request.Context()
-	var body struct {
-		Name string `json:"name" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		if err == io.EOF {
-			c.JSON(400, gin.H{"error": "Request body is empty"})
-			return
-		}
-		c.JSON(400, gin.H{"error": err.Error()})
+	err := c.Request.ParseForm()
+	if err != nil {
+		logger.ErrorContext(ctx, "error", "msg", err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	name, ok := c.Request.PostForm["name"]
+	if !ok || len(name) == 0 || name[0] == "" {
+		c.JSON(400, gin.H{"error": "invalid name"})
+		return
+	}
+	if err := a.newPlaylist(ctx, name[0]); err != nil {
+		logger.ErrorContext(ctx, "error", "msg", err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	playlists, err := a.Store.ListPlaylist(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, "error", "msg", err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.HTML(200, "playlist.html", gin.H{"Playlist": playlists})
+}
 
+func (a App) newPlaylist(ctx context.Context, name string) error {
 	uuid, err := uuid.NewV7()
 	if err != nil {
-		logger.ErrorContext(ctx, err.Error())
-		c.JSON(500, gin.H{"error": "error with uuid"})
-		return
+		a.logger.Error(err.Error())
+		return fmt.Errorf("error with uuid")
+
 	}
-	err = a.Store.CreatePlaylist(ctx, uuid, body.Name)
+	err = a.Store.CreatePlaylist(ctx, uuid, name)
 	if err != nil {
-		logger.ErrorContext(ctx, err.Error())
-		c.JSON(500, gin.H{"error": "createPlaylist failed"})
-		return
+		a.logger.ErrorContext(ctx, err.Error())
+		return fmt.Errorf("createPlaylist failed")
 	}
-	c.JSON(201, gin.H{"id": uuid.String(), "name": body.Name})
+	a.logger.InfoContext(ctx, "new playlist created", "name", name, "id", uuid)
+	return nil
 }
+
 func (a App) getPlaylistHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger := a.logger.With("handler", "getPlaylistHandler")
@@ -80,6 +98,13 @@ func (a App) deletePlaylistHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	logger := a.logger.With("handler", "deletePlaylistHandler")
 	id := c.Param("id")
+	if id == "" {
+		id = c.Query("id")
+	}
+	if id == "" {
+		c.JSON(400, gin.H{"error": "id missing"})
+		return
+	}
 	if id == models.Default_playlist_id {
 		c.JSON(400, gin.H{"error": "cannot delete default playlist"})
 		return
@@ -95,7 +120,13 @@ func (a App) deletePlaylistHandler(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "deletetPlaylist failed"})
 		return
 	}
-	c.Status(200)
+	playlists, err := a.Store.ListPlaylist(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
+		c.JSON(500, gin.H{"error": "deletetPlaylist failed"})
+		return
+	}
+	c.HTML(200, "playlist.html", gin.H{"Playlist": playlists})
 }
 
 func (a App) updatePlaylistHandler(c *gin.Context) {

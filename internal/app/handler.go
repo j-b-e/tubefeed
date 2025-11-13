@@ -33,10 +33,17 @@ func (a App) getRootHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+	playlists, err := a.Store.ListPlaylist(ctx)
+	if err != nil {
+		logger.ErrorContext(ctx, err.Error())
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"playlist_name": models.Default_playlist_name,
 		"playlist_id":   models.Default_playlist_id,
 		"Items":         requests,
+		"Playlist":      playlists,
 	})
 }
 

@@ -239,8 +239,16 @@ func (db *Database) UpdatePlaylist(ctx context.Context, id uuid.UUID, name strin
 }
 
 // ListPlaylist returns all playlists from the database
-func (db *Database) ListPlaylist(context.Context) ([]models.Playlist, error) {
-	panic("not implemented") // TODO: Implement
+func (db *Database) ListPlaylist(ctx context.Context) ([]models.Playlist, error) {
+	dbplaylist, err := db.queries.ListPlaylist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	playlists := []models.Playlist{}
+	for _, p := range dbplaylist {
+		playlists = append(playlists, models.Playlist{ID: p.ID, Name: p.Name, CreatedAt: p.CreatedAt})
+	}
+	return playlists, nil
 }
 
 func (db *Database) CreateItem(ctx context.Context, item models.Request) error {

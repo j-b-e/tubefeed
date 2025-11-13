@@ -1,0 +1,6 @@
+<label for="playlist-select">Playlist:</label>
+<select id="playlist-select" name="id" hx-target="#audio-list" hx-trigger="change">
+    {{ range .Playlist }}
+    <option value="{{ .ID }}" hx-get="/playlist/{{ .ID }}">{{ .Name }}</option>
+    {{ end }}
+</select>
